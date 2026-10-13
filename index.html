@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<!-- Brain explorer 3D. MIT licence. AI-assisted; see README.md. Educational use only; not clinical guidance. -->
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Brain explorer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600&family=Bitter:wght@500;700&display=swap">
+<style>
+:root{--bg:#EEF1F4;--surface:#fff;--ink:#1A2233;--muted:#586175;--line:#CCD3DE;--accent:#7A2E65;--accent-ink:#fff;--l:78%;--tint:#F3E7EF;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161F;--surface:#1C2230;--ink:#E7EAF2;--muted:#A0A8BB;--line:#313A4D;--accent:#E69BD0;--accent-ink:#2A0F22;--l:38%;--tint:#2E2030}}
+:root[data-theme="dark"]{--bg:#12161F;--surface:#1C2230;--ink:#E7EAF2;--muted:#A0A8BB;--line:#313A4D;--accent:#E69BD0;--accent-ink:#2A0F22;--l:38%;--tint:#2E2030}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:1rem/1.55 Figtree,system-ui,sans-serif}
+h1,h2,h3{font-family:Bitter,Georgia,serif;margin:0;line-height:1.25}
+h1{font-size:1.6rem}h2{font-size:1.25rem;margin-bottom:.4rem}h3{font-size:1rem;margin:1rem 0 .2rem}
+.wrap{max-width:720px;margin:0 auto;padding:1rem}
+.sub{color:var(--muted);margin:.3rem 0 1rem;max-width:62ch}
+button,select{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:.45rem .9rem;min-height:44px}
+button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:8px;padding:.4rem .6rem;background:var(--surface)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.8rem}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.5rem;margin-bottom:.8rem}
+svg{width:100%;height:auto;display:block;max-height:60vh}
+.reg{cursor:pointer;fill:hsl(var(--h) 40% var(--l));stroke:var(--surface);stroke-width:2;transition:opacity .15s}
+.dim{opacity:.2}
+.sel{stroke:var(--ink);stroke-width:4}
+.lab{font:600 13px Figtree,sans-serif;text-anchor:middle;pointer-events:none;fill:var(--ink)}
+.sulc{fill:none;stroke:var(--ink);stroke-opacity:.2;stroke-width:1.5;pointer-events:none}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:1rem;margin-bottom:.8rem}
+.panel ul{margin:.2rem 0 0;padding-left:1.1rem}
+.lens{background:var(--tint)}
+.muted{color:var(--muted);font-size:.9rem}
+details{margin-top:1rem}
+summary{cursor:pointer;min-height:32px;font-weight:600}
+.refs p{margin:.5rem 0;padding-left:1.5rem;text-indent:-1.5rem;font-size:.9rem}
+a{color:var(--accent)}
+canvas{width:100%;height:56vh;min-height:300px;display:block;touch-action:none;border-radius:8px;cursor:grab}canvas:active{cursor:grabbing}
+input[type=range]{width:100%;min-height:32px}input[type=search],textarea{width:100%;font:inherit;color:inherit;border:1px solid var(--line);border-radius:8px;padding:.5rem .6rem;background:var(--surface);min-height:44px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:.8rem}.cols .panel{margin-bottom:0}.ctl{display:grid;gap:.5rem}.ctl label{display:block}[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Brain explorer</h1>
+<p class="sub">A schematic left hemisphere in 3D. Drag to rotate, then use Internal view or the slice controls to reach deeper structures. Explore by region, function or network to see why "one region, one job" is a poor model.</p>
+<div class="row" role="group" aria-label="Lens" id="modes"></div>
+<div id="pick"></div>
+<div class="stage"><canvas id="cv" tabindex="0" role="img" aria-label="Interactive 3D schematic of the left hemisphere and deep structures. Arrow keys rotate and plus or minus zoom. Every structure is also available as a button below."></canvas></div>
+<div class="row" id="vw" role="group" aria-label="View"></div>
+<div class="panel ctl"><button id="int" aria-pressed="false">Internal view</button><label class="muted">Cortex opacity<input type="range" id="op" min="10" max="100" value="100"></label><label class="muted">Slice<select id="ax"><option value="none">No slice</option><option value="x">Side to side (sagittal)</option><option value="z">Front to back (coronal)</option><option value="y">Top to bottom (axial)</option></select></label><label class="muted">Slice position<input type="range" id="cut" min="0" max="100" value="100"></label><label class="muted"><input type="checkbox" id="both" checked> Show both hemispheres</label></div>
+<input type="search" id="q" placeholder="Search structures or functions" aria-label="Search structures or functions"><br><br>
+<div class="row" id="chips" role="group" aria-label="Regions"></div>
+<div id="info" aria-live="polite"></div>
+<details class="refs"><summary>References</summary><div id="refs"></div></details>
+<p class="muted">Educational summary, not clinical guidance. Shapes, sizes and positions are schematic and approximate. Cortical regions use simple boundaries, and the right hemisphere is a mirror image.</p>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const R={
+pfc:{n:'Prefrontal cortex',h:215,fn:['Planning and keeping goals in mind','Working memory','Inhibiting impulses and switching strategy','Speech production (left inferior frontal region, including Broca\'s area)','Social and self-related thinking (medial parts)'],
+ ef:'Supports all three core executive functions described by Diamond (2013): inhibition, working memory and cognitive flexibility, plus the planning and reasoning built on them.',
+ les:'Damage can produce dysexecutive problems such as disorganisation, impulsivity and perseveration. Left inferior frontal damage is classically linked to non-fluent (Broca\'s) aphasia, though the picture is more complex than one area.'},
+motor:{n:'Motor and premotor cortex',h:160,fn:['Voluntary movement (primary motor cortex, precentral gyrus)','Planning and sequencing actions (premotor cortex)','Eye-movement control (frontal eye fields at the premotor border)','Articulation of speech'],
+ ef:'Stopping a prepared action involves frontal motor-related circuits, including medial areas not drawn here. Direct executive roles are less clear than for prefrontal cortex.',
+ les:'Primary motor damage typically causes weakness on the opposite side of the body. Premotor or parietal damage can disrupt skilled, sequenced movement (apraxia).'},
+sens:{n:'Somatosensory cortex',h:95,fn:['Touch, pressure and pain','Body position sense (proprioception)','Body maps (somatotopy)'],
+ ef:'No core executive role. It supplies sensory feedback that other regions use to monitor and adjust action.',
+ les:'Damage can impair touch, position sense and tactile object recognition on the opposite side of the body.'},
+par:{n:'Parietal cortex',h:40,fn:['Directing spatial attention','Combining sensory information for action','Body and space representation','Holding information in mind alongside prefrontal cortex','Number and quantity processing'],
+ ef:'Works with prefrontal cortex in attentional control and in maintaining information (Corbetta & Shulman, 2002).',
+ les:'Right parietal damage is classically linked to hemispatial neglect of the left side of space.'},
+temp:{n:'Temporal cortex',h:18,fn:['Hearing and sound processing (superior temporal)','Understanding speech and words (left posterior regions)','Recognising objects and faces (ventral surface)','Long-term memory (medial temporal lobe, not visible here)'],
+ ef:'Largely indirect: language comprehension and memory retrieval provide content that executive processes then select and manipulate.',
+ les:'Left posterior temporal damage is classically linked to fluent (Wernicke\'s) aphasia. Medial temporal damage causes profound new-memory loss, as in patient H.M. (Scoville & Milner, 1957).'},
+occ:{n:'Occipital cortex',h:280,fn:['First stages of visual processing (primary visual cortex)','Edges, orientation, colour and motion','Feeding two visual pathways: "what" (ventral) and "where/how" (dorsal)'],
+ ef:'Not an executive region. Visual input is what attentional control selects among.',
+ les:'Damage can cause visual field loss or cortical blindness. More anterior occipitotemporal damage can impair recognition (visual agnosia).'},
+cb:{n:'Cerebellum',h:335,fn:['Coordination and balance','Timing and fine-tuning of movement','Learning skilled movements','Contributions to language, attention and emotion regulation'],
+ ef:'Cerebellar contributions to cognition and affect are documented after damage (Schmahmann & Sherman, 1998). Its precise role in executive tasks is debated.',
+ les:'Damage commonly causes unsteady gait and poorly scaled movements (ataxia, dysmetria). Cognitive and affective changes are also reported.'},
+bs:{n:'Brainstem',h:200,fn:['Arousal and sleep-wake regulation (reticular formation)','Breathing and heart-rate control','Relaying signals between brain and body','Cranial nerve nuclei'],
+ ef:'Sets baseline alertness, a precondition for sustained attention rather than an executive process itself.',
+ les:'Small lesions can have large effects, including disordered consciousness, and locked-in syndrome after ventral pontine damage.'}};
+const FN={'Executive control':['pfc','par','cb'],'Working memory':['pfc','par'],'Attention':['par','pfc','motor'],'Language':['pfc','temp','par','motor'],'Memory':['temp','pfc'],'Vision':['occ','temp','par'],'Movement':['motor','sens','par','cb'],'Touch and body sense':['sens','par'],'Hearing':['temp'],'Arousal and alertness':['bs']};
+const NET={'Visual':['occ'],'Somatomotor':['motor','sens','temp'],'Dorsal attention':['par','motor'],'Ventral attention / salience':['pfc','par','temp'],'Frontoparietal control':['pfc','par'],'Default mode':['pfc','par','temp']};
+const NETD={'Visual':'Processes visual input; centred on occipital cortex.','Somatomotor':'Movement and touch. In this parcellation it also includes auditory cortex.','Dorsal attention':'Voluntary, goal-directed orienting of attention (Corbetta & Shulman, 2002).','Ventral attention / salience':'Detecting behaviourally relevant or unexpected events. Anterior insula and cingulate are core nodes (Seeley et al., 2007) but are not visible from the side.','Frontoparietal control':'Flexible, goal-directed control that couples with other networks depending on the task.','Default mode':'More active at rest and during self-referential thought and memory (Raichle, 2015).'};
+const $=id=>document.getElementById(id);
+$('refs').innerHTML=['Corbetta, M., & Shulman, G. L. (2002). Control of goal-directed and stimulus-driven attention in the brain. <i>Nature Reviews Neuroscience, 3</i>(3), 201–215. https://doi.org/10.1038/nrn755','Diamond, A. (2013). Executive functions. <i>Annual Review of Psychology, 64</i>, 135–168. https://doi.org/10.1146/annurev-psych-113011-143750','Pessoa, L. (2008). On the relationship between emotion and cognition. <i>Nature Reviews Neuroscience, 9</i>(2), 148–158. https://doi.org/10.1038/nrn2317','Poldrack, R. A. (2006). Can cognitive processes be inferred from neuroimaging data? <i>Trends in Cognitive Sciences, 10</i>(2), 59–63. https://doi.org/10.1016/j.tics.2005.12.004','Raichle, M. E. (2015). The brain\'s default mode network. <i>Annual Review of Neuroscience, 38</i>, 433–447. https://doi.org/10.1146/annurev-neuro-071013-014030','Schmahmann, J. D., & Sherman, J. C. (1998). The cerebellar cognitive affective syndrome. <i>Brain, 121</i>(4), 561–579. https://doi.org/10.1093/brain/121.4.561','Scoville, W. B., & Milner, B. (1957). Loss of recent memory after bilateral hippocampal lesions. <i>Journal of Neurology, Neurosurgery & Psychiatry, 20</i>(1), 11–21. https://doi.org/10.1136/jnnp.20.1.11','Seeley, W. W., Menon, V., Schatzberg, A. F., Keller, J., Glover, G. H., Kenna, H., Reiss, A. L., & Greicius, M. D. (2007). Dissociable intrinsic connectivity networks for salience processing and executive control. <i>Journal of Neuroscience, 27</i>(9), 2349–2356. https://doi.org/10.1523/JNEUROSCI.5587-06.2007','Yeo, B. T. T., Krienen, F. M., Sepulcre, J., Sabuncu, M. R., Lashkari, D., Hollinshead, M., Roffman, J. L., Smoller, J. W., Zöllei, L., Polimeni, J. R., Fischl, B., Liu, H., & Buckner, R. L. (2011). The organization of the human cerebral cortex estimated by intrinsic functional connectivity. <i>Journal of Neurophysiology, 106</i>(3), 1125–1165. https://doi.org/10.1152/jn.00338.2011'].map(t=>`<p>${t}</p>`).join('');
+const D={
+hip:{n:'Hippocampus',h:50,fn:['Forming new episodic memories','Spatial memory and navigation','Linking events to their context','Memory consolidation'],ef:'Not an executive region, but it supplies episodic and contextual information that prefrontal control selects and uses during retrieval.',les:'Bilateral medial temporal damage causes profound loss of new memories, as in patient H.M. (Scoville & Milner, 1957).'},
+amy:{n:'Amygdala',h:0,fn:['Detecting emotionally significant stimuli','Emotional learning, including fear conditioning','Modulating memory for emotional events','Processing social and facial emotion cues'],ef:'Interacts with prefrontal regions in emotion regulation. Emotion and cognition are better seen as integrated than separate (Pessoa, 2008).',les:'Bilateral damage has been linked to impaired recognition of fear in faces (Adolphs et al., 1994); effects vary with lesion extent.'},
+thal:{n:'Thalamus',h:120,fn:['Relaying sensory signals to cortex (except smell)','Gating attention and arousal','Relaying motor loops via basal ganglia and cerebellum','Looping with prefrontal cortex in higher-order functions'],ef:'Higher-order nuclei form loops with prefrontal cortex and contribute to attention and working memory. Evidence is less direct than for cortex.',les:'Thalamic stroke can cause sensory loss, altered consciousness, and memory or executive problems, depending on the nuclei affected.'},
+bg:{n:'Basal ganglia',h:245,fn:['Selecting and initiating actions','Habit and procedural learning','Reward-based learning (dopamine)','Cognitive and motivational loops with prefrontal cortex'],ef:'Parallel loops link basal ganglia with prefrontal cortex (Alexander et al., 1986) and are thought to support selecting actions and cognitive content.',les:'Parkinson\'s disease involves loss of dopamine inputs, causing slowed movement, tremor and rigidity. Huntington\'s disease affects caudate and putamen.'},
+ins:{n:'Insula',h:70,fn:['Interoception (sensing internal bodily state)','Awareness of feelings and bodily states','Salience detection (anterior insula)','Taste and pain processing'],ef:'Anterior insula is a core salience-network node that helps switch between large-scale networks (Seeley et al., 2007; Craig, 2009).',les:'Damage can alter pain, taste and awareness of bodily and emotional states. Lesions rarely respect its boundaries, so effects vary.'},
+cin:{n:'Cingulate cortex',h:310,fn:['Monitoring conflict and errors','Linking pain and negative affect with control','Motivation and effort (anterior)','Self-referential processing and memory (posterior)'],ef:'Anterior cingulate is implicated in cognitive control and monitoring (Shackman et al., 2011). Posterior cingulate is a default mode hub.',les:'Large anterior cingulate lesions are linked to reduced spontaneous behaviour (akinetic mutism), though such cases are rare.'},
+cc:{n:'Corpus callosum',h:175,fn:['Connecting the two hemispheres','Integrating information across the midline','Coordinating bilateral movement and attention'],ef:'White matter, not a processing region. It supports interhemispheric integration when tasks recruit both prefrontal cortices.',les:'Surgical severing (split-brain procedure) disconnects the hemispheres in certain tasks (Gazzaniga, 2005).'},
+hyp:{n:'Hypothalamus',h:25,fn:['Homeostasis: temperature, hunger, thirst','Controlling the pituitary and stress hormones','Sleep-wake and circadian regulation','Motivated behaviours such as feeding'],ef:'Not an executive region. It sets internal states (hunger, stress) that influence cognitive control indirectly.',les:'Damage can disrupt appetite, temperature control, sleep and hormonal regulation (Saper & Lowell, 2014).'}};
+Object.assign(R,D);
+FN['Memory'].push('hip');FN['Executive control'].push('cin','bg');FN['Movement'].push('bg','thal');FN['Vision'].push('thal');FN['Hearing'].push('thal');FN['Touch and body sense'].push('thal','ins');FN['Arousal and alertness'].push('thal','hyp');FN['Emotion and motivation']=['amy','hyp','ins','cin','pfc'];
+NET['Ventral attention / salience'].push('ins','cin');NET['Default mode'].push('cin');
+$('refs').innerHTML+=['Adolphs, R., Tranel, D., Damasio, H., & Damasio, A. (1994). Impaired recognition of emotion in facial expressions following bilateral damage to the human amygdala. <i>Nature, 372</i>(6507), 669–672. https://doi.org/10.1038/372669a0','Alexander, G. E., DeLong, M. R., & Strick, P. L. (1986). Parallel organization of functionally segregated circuits linking basal ganglia and cortex. <i>Annual Review of Neuroscience, 9</i>, 357–381. https://doi.org/10.1146/annurev.ne.09.030186.002041','Craig, A. D. (2009). How do you feel — now? The anterior insula and human awareness. <i>Nature Reviews Neuroscience, 10</i>(1), 59–70. https://doi.org/10.1038/nrn2555','Gazzaniga, M. S. (2005). Forty-five years of split-brain research and still going strong. <i>Nature Reviews Neuroscience, 6</i>(8), 653–659. https://doi.org/10.1038/nrn1723','Poldrack, R. A., Baker, C. I., Durnez, J., Gorgolewski, K. J., Matthews, P. M., Munafò, M. R., Nichols, T. E., Poline, J.-B., Vul, E., & Yarkoni, T. (2017). Scanning the horizon: Towards transparent and reproducible neuroimaging research. <i>Nature Reviews Neuroscience, 18</i>(2), 115–126. https://doi.org/10.1038/nrn.2016.167','Saper, C. B., & Lowell, B. B. (2014). The hypothalamus. <i>Current Biology, 24</i>(23), R1111–R1116. https://doi.org/10.1016/j.cub.2014.10.023','Shackman, A. J., Salomons, T. V., Slagter, H. A., Fox, A. S., Winter, J. J., & Davidson, R. J. (2011). The integration of negative affect, pain and cognitive control in the cingulate cortex. <i>Nature Reviews Neuroscience, 12</i>(3), 154–167. https://doi.org/10.1038/nrn2994'].map(t=>`<p>${t}</p>`).join('');
+const ids=Object.keys(R),opt=(o,v)=>Object.keys(o).map(k=>`<option ${k===v?'selected':''}>${k}</option>`).join('');
+const ls={g:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
+let bm=[];try{bm=JSON.parse(ls.g('bxb')||'[]')}catch(e){}
+let S={mode:'region',sel:null,fn:Object.keys(FN)[0],net:Object.keys(NET)[0],q:'',cmp:[],qz:null,sc:[0,0],bm,op:1,ax:'none',cut:1,both:true};
+/* 3D scene */
+const cv=$('cv'),rd=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});rd.localClippingEnabled=true;rd.setPixelRatio(Math.min(devicePixelRatio||1,2));
+const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(35,1,.1,50),pl=new THREE.Plane(new THREE.Vector3(-1,0,0),9);
+sc.add(new THREE.AmbientLight(0xffffff,.8));[[3,3,3,.55],[-3,-1,-3,.35]].forEach(a=>{const d=new THREE.DirectionalLight(0xffffff,a[3]);d.position.set(a[0],a[1],a[2]);sc.add(d)});
+const sm=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t)};
+const rgOf=p=>{const q=p.z+.3*(p.y-.2);return p.y<-.1-.18*(p.z-.4)&&p.z<.45&&p.z>-.6?'temp':q>.4?'pfc':q>.22?'motor':q>.05?'sens':q>-.5?'par':'occ'};
+const g=new THREE.SphereGeometry(1,128,96),pa=g.attributes.position,vr=[],gv=[];
+for(let i=0;i<pa.count;i++){const sx=pa.getX(i),sy=pa.getY(i),sz=pa.getZ(i),
+ n=(Math.sin(20*sz+3*Math.sin(9*sy)+2*sx)+Math.sin(17*sy+4*Math.sin(7*sz)+3*sx)+Math.sin(15*sx+14*sz+2*Math.sin(6*sy)))/3,gr=Math.pow(1-Math.abs(n),4),d=1-.035*gr,
+ t=sm(-.7,-.3,sz)*sm(.65,.25,sz);
+ let x=.38+.5*sx*(1-.18*sm(.45,1,sz)-.22*sm(-.4,-1,sz)),y=.08+.58*sy*(sy<0?.55+.45*t:1),z=sz;
+ x-=.09*sm(0,.8,sx)*Math.exp(-((sz-.4)*(sz-.4)/.012+(sy+.12)*(sy+.12)/.03));
+ x=Math.max(.38+(x-.38)*d,0);y=.08+(y-.08)*d;z*=d;
+ const p=new THREE.Vector3(x,y,z);pa.setXYZ(i,x,y,z);vr.push(rgOf(p));gv.push(x<.003?0:gr)}
+g.computeVertexNormals();g.setAttribute('color',new THREE.BufferAttribute(new Float32Array(pa.count*3),3));
+const cm=new THREE.MeshLambertMaterial({vertexColors:true,clippingPlanes:[pl]}),cx=new THREE.Mesh(g,cm),cxb=new THREE.Mesh(g,new THREE.MeshBasicMaterial({side:THREE.BackSide,clippingPlanes:[pl]}));cx.userData.r='cortex';cxb.userData.back=1;
+const mk=(k,geo,x,y,z,s)=>{const m=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({transparent:true}));m.userData.r=k;m.position.set(x,y,z);if(s)m.scale.set(s[0],s[1],s[2]);return m};
+const cbg=new THREE.SphereGeometry(1,48,32);{const a=cbg.attributes.position;for(let i=0;i<a.count;i++){const x=a.getX(i),y=a.getY(i),z=a.getZ(i),f=1+.05*Math.sin(34*y);a.setXYZ(i,x*f,y*(y<0?.8:1),z*f)}cbg.computeVertexNormals()}
+const sp=new THREE.SphereGeometry(1,24,16),tb=(pts,r)=>new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(a=>new THREE.Vector3(a[0],a[1],a[2]))),32,r,8);
+const Lg=new THREE.Group();Lg.add(cx,cxb,mk('cb',cbg,.24,-.5,-.62,[.25,.16,.26]),mk('thal',sp,.1,.06,-.08,[.09,.08,.12]),mk('bg',sp,.22,.13,.16,[.1,.1,.16]),mk('amy',sp,.27,-.22,.14,[.06,.06,.06]),mk('ins',sp,.31,-.02,.12,[.04,.12,.24]),mk('hyp',sp,0,-.12,.06,[.04,.04,.05]),
+ mk('hip',tb([[.17,.02,-.4],[.24,-.1,-.3],[.3,-.2,-.05],[.28,-.2,.08]],.04),0,0,0),mk('cin',tb([[.04,.15,.5],[.04,.42,.3],[.04,.46,-.1],[.04,.28,-.5]],.035),0,0,0),mk('cc',tb([[0,.1,.4],[0,.22,.25],[0,.25,-.1],[0,.14,-.45]],.03),0,0,0));
+const Rg=Lg.clone();Rg.scale.x=-1;Rg.visible=false;
+const bs=mk('bs',new THREE.CylinderGeometry(.09,.07,.6,16),0,-.52,-.18);bs.rotation.x=-.3;sc.add(Lg,Rg,bs);
+const meshes=[];[Lg,Rg].forEach(G=>G.children.forEach(o=>o.userData.back||meshes.push(o)));meshes.push(bs);const backs=[];[Lg,Rg].forEach(G=>G.children.forEach(o=>o.userData.back&&backs.push(o)));
+/* camera */
+let th=Math.PI/2,ph=Math.PI/2,dist=3.4,au=false,dirty=true;const rm=matchMedia('(prefers-reduced-motion:reduce)').matches,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+function place(){const t=S.both?0:.28;cam.position.set(t+dist*Math.sin(ph)*Math.sin(th),.05+dist*Math.cos(ph),dist*Math.sin(ph)*Math.cos(th));cam.lookAt(t,.05,0)}
+function rs(){const w=cv.clientWidth,h=cv.clientHeight;if(!w||!h)return;rd.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();dirty=true}
+new ResizeObserver(rs).observe(cv);
+(function loop(){if(au&&!rm){th+=.008;dirty=true}if(dirty){place();rd.render(sc,cam);dirty=false}requestAnimationFrame(loop)})();
+const P=new Map();let mv=0;
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);P.set(e.pointerId,[e.clientX,e.clientY]);mv=0});
+cv.addEventListener('pointermove',e=>{if(!P.has(e.pointerId))return;const o=P.get(e.pointerId),n=[e.clientX,e.clientY];
+ if(P.size===2){const q=[...P.entries()].find(a=>a[0]!==e.pointerId)[1],a=Math.hypot(o[0]-q[0],o[1]-q[1]),b=Math.hypot(n[0]-q[0],n[1]-q[1]);if(a&&b)dist=clamp(dist*a/b,1.6,7)}
+ else{th-=(n[0]-o[0])*.008;ph=clamp(ph-(n[1]-o[1])*.008,.05,3.09)}
+ mv+=Math.abs(n[0]-o[0])+Math.abs(n[1]-o[1]);P.set(e.pointerId,n);dirty=true});
+cv.addEventListener('pointerup',e=>{P.delete(e.pointerId);if(mv<6&&!P.size)pick(e)});cv.addEventListener('pointercancel',e=>P.delete(e.pointerId));
+cv.addEventListener('wheel',e=>{e.preventDefault();dist=clamp(dist*(1+e.deltaY*.001),1.6,7);dirty=true},{passive:false});
+cv.addEventListener('keydown',e=>{const k=e.key,m={ArrowLeft:()=>th-=.12,ArrowRight:()=>th+=.12,ArrowUp:()=>ph=clamp(ph-.12,.05,3.09),ArrowDown:()=>ph=clamp(ph+.12,.05,3.09),'+':()=>dist=clamp(dist*.9,1.6,7),'=':()=>dist=clamp(dist*.9,1.6,7),'-':()=>dist=clamp(dist/.9,1.6,7)};if(m[k]){e.preventDefault();m[k]();dirty=true}});
+const rc=new THREE.Raycaster();
+function pick(e){const r=cv.getBoundingClientRect();rc.setFromCamera({x:(e.clientX-r.left)/r.width*2-1,y:-((e.clientY-r.top)/r.height)*2+1},cam);
+ let h=rc.intersectObjects(meshes.filter(o=>o.parent.visible)).filter(x=>x.object.userData.r!=='cortex'||pl.distanceToPoint(x.point)>=0);
+ if(S.op<.5){const d=h.filter(x=>x.object.userData.r!=='cortex');if(d.length)h=d}
+ if(!h.length)return;let k=h[0].object.userData.r;if(k==='cortex')k=vr[h[0].face.a];choose(k)}
+/* state and views */
+const hit=q=>{q=q.toLowerCase();return ids.filter(k=>[R[k].n,...R[k].fn,R[k].ef,R[k].les].join(' ').toLowerCase().includes(q))};
+function lit(){if(S.mode==='function')return FN[S.fn];if(S.mode==='network')return NET[S.net];if(S.mode==='compare')return S.cmp.length?S.cmp:ids;if(S.mode==='quiz')return ids;if(S.q.trim())return hit(S.q.trim());return S.sel?[S.sel]:ids}
+const newQ=()=>{const a=ids[Math.random()*ids.length|0];S.qz={a,t:R[a].fn[Math.random()*R[a].fn.length|0]}};
+function choose(k){const z=S.qz;if(S.mode==='quiz'){if(z&&!z.done){z.done=1;z.pick=k;S.sc[1]++;if(R[k].fn.includes(z.t))S.sc[0]++}}else if(S.mode==='compare')S.cmp=S.cmp.length===2?[k]:S.cmp.concat(k);else S.sel=S.sel===k&&S.mode==='region'?null:k;view()}
+const lv=()=>parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--l'))/100;
+function paint(on,sl){const l=lv(),C={},gr=new THREE.Color().setHSL(0,0,Math.min(.92,l+.1));ids.forEach(k=>C[k]=new THREE.Color().setHSL(R[k].h/360,sl(k)?.75:.45,sl(k)?l-.18:l));
+ const ca=g.attributes.color;for(let i=0;i<vr.length;i++){const c=on.includes(vr[i])?C[vr[i]]:gr,f=1-.32*gv[i];ca.setXYZ(i,c.r*f,c.g*f,c.b*f)}ca.needsUpdate=true;
+ backs[0].material.color.set(getComputedStyle(document.documentElement).getPropertyValue('--tint').trim()||'#ccc');meshes.forEach(m=>{const k=m.userData.r;if(k==='cortex')return;const o=on.includes(k);m.material.color.copy(o?C[k]:gr);m.material.opacity=o?1:.22;m.material.depthWrite=o});dirty=true}
+function apply(){cm.opacity=S.op;cm.transparent=S.op<1;cm.depthWrite=S.op>=1;cm.needsUpdate=true;const c=S.cut,a=S.ax;pl.normal.set(a==='x'?-1:0,a==='y'?-1:0,a==='z'?-1:0);pl.constant=a==='none'?9:a==='x'?(2*c-1)*.95:a==='y'?.07+(2*c-1)*.7:(2*c-1)*1.1;Rg.visible=S.both;backs.forEach(o=>o.visible=S.op>=1);dirty=true}
+const pn=k=>{const r=R[k],ns=Object.keys(NET).filter(n=>NET[n].includes(k)),fs=Object.keys(FN).filter(n=>FN[n].includes(k));return `<h2>${r.n}</h2><h3>Often associated with</h3><ul>${r.fn.map(x=>`<li>${x}</li>`).join('')}</ul><h3>Appears in ${fs.length} of the functions here</h3><p>${fs.join(', ')||'None listed'}</p><h3>Cortical networks</h3><p>${ns.join(', ')||'Not a cortical network node (or not covered by this parcellation).'}</p><h3>Executive functioning</h3><p>${r.ef}</p><h3>Lesion examples</h3><p>${r.les}</p>`};
+function view(){
+ const on=lit(),hq=S.q.trim()?hit(S.q.trim()):null,z=S.qz,sl=k=>S.mode==='compare'?S.cmp.includes(k):S.mode==='quiz'?!!(z&&z.done&&k===z.a):k===S.sel;
+ document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===S.mode));
+ document.querySelectorAll('#chips button').forEach(b=>{const k=b.dataset.r;b.classList.toggle('on',sl(k));b.hidden=!!hq&&!hq.includes(k);b.textContent=(S.bm.includes(k)?'★ ':'')+R[k].n});
+ $('pick').innerHTML=S.mode==='function'?`<label for="pk" class="muted">Choose a function</label><select id="pk" data-s="fn">${opt(FN,S.fn)}</select><br><br>`:S.mode==='network'?`<label for="pk" class="muted">Choose a network</label><select id="pk" data-s="net">${opt(NET,S.net)}</select><br><br>`:'';
+ paint(on,sl);let h='';
+ if(S.mode==='function')h+=`<div class="panel lens"><h2>${S.fn}</h2><p>Regions commonly involved: ${FN[S.fn].map(k=>R[k].n).join(', ')}.</p><p class="muted">One function recruits several regions. Membership is simplified.</p></div>`;
+ if(S.mode==='network')h+=`<div class="panel lens"><h2>${S.net} network</h2><p>${NETD[S.net]}</p><p>Regions containing nodes: ${NET[S.net].map(k=>R[k].n).join(', ')}.</p><p class="muted">Based on group-average resting-state parcellation (Yeo et al., 2011), which covers cortex only. Boundaries vary between individuals.</p></div>`;
+ if(S.mode==='quiz'){if(!z)newQ();const q=S.qz;h+=`<div class="panel lens"><h2>Quiz</h2><p>Which structure is often associated with: <b>${q.t}</b>?</p><p>${q.done?(R[q.pick].fn.includes(q.t)?'Correct: ':'Not quite. Answer: ')+R[q.a].n:'Tap the brain or a button below.'}</p><p class="muted">Score ${S.sc[0]}/${S.sc[1]}. Some functions involve several structures.</p>${q.done?'<button id="nx">Next question</button>':''}</div>`}
+ else if(S.mode==='compare')h+=S.cmp.length?`<div class="cols">${S.cmp.map(k=>`<div class="panel">${pn(k)}</div>`).join('')}</div>${S.cmp.length<2?'<p class="muted">Choose a second structure to compare.</p>':''}`:`<div class="panel"><h2>Compare</h2><p>Choose two structures, on the brain or with the buttons.</p></div>`;
+ else if(S.sel)h+=`<div class="panel">${pn(S.sel)}<h3>Your notes</h3><textarea id="nt" rows="3" aria-label="Notes on ${R[S.sel].n}"></textarea><p><button data-bm="${S.sel}" class="${S.bm.includes(S.sel)?'on':''}">${S.bm.includes(S.sel)?'Remove bookmark':'Bookmark'}</button></p><p class="muted">Notes and bookmarks stay in this browser only.</p></div>`;
+ else if(S.mode==='region')h+=`<div class="panel"><h2>Choose a structure</h2><p>Tap the brain or a button below. Drag to rotate. Use Internal view or the slice controls to see deeper structures.</p></div>`;
+ h+=`<div class="panel"><h3 style="margin-top:0">Reading this critically</h3><p class="muted">Regions and functions map many-to-many (Pessoa, 2008). Activation in a region does not show which mental process occurred, because the inference is probabilistic (Poldrack, 2006). Findings are group-level and neuroimaging faces reproducibility challenges (Poldrack et al., 2017), so treat these summaries as orientation, not explanation.</p></div>`;
+ $('info').innerHTML=h;const nt=$('nt');if(nt){nt.value=ls.g('bxn:'+S.sel)||'';nt.oninput=()=>ls.s('bxn:'+S.sel,nt.value)}}
+/* controls */
+$('modes').innerHTML=[['region','By region'],['function','By function'],['network','By network'],['compare','Compare'],['quiz','Quiz']].map(a=>`<button data-m="${a[0]}">${a[1]}</button>`).join('');
+$('chips').innerHTML=ids.map(k=>`<button data-r="${k}"></button>`).join('');
+$('vw').innerHTML=[['Left side','1.5708,1.5708'],['Medial','-1.5708,1.5708'],['Front','0,1.5708'],['Top','0,.05']].map(a=>`<button data-v="${a[1]}">${a[0]}</button>`).join('')+(rm?'':'<button data-a="1">Auto-rotate</button>');
+$('vw').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.a){au=!au;b.classList.toggle('on',au)}else{const v=b.dataset.v.split(',').map(Number);th=v[0];ph=v[1];dirty=true}};
+$('op').oninput=e=>{S.op=e.target.value/100;$('int').classList.toggle('on',S.op<1);apply()};$('ax').onchange=e=>{S.ax=e.target.value;apply()};$('cut').oninput=e=>{S.cut=e.target.value/100;apply()};$('both').onchange=e=>{S.both=e.target.checked;apply()};
+$('int').onclick=e=>{S.op=S.op<1?1:.15;$('op').value=S.op*100;e.currentTarget.classList.toggle('on',S.op<1);apply()};
+$('q').oninput=e=>{S.q=e.target.value;view()};
+document.addEventListener('click',e=>{const r=e.target.closest('#chips [data-r]'),m=e.target.closest('[data-m]'),b=e.target.closest('[data-bm]');
+ if(r)choose(r.dataset.r);else if(m){S.mode=m.dataset.m;if(S.mode==='quiz')newQ();view()}
+ else if(b){const k=b.dataset.bm;S.bm=S.bm.includes(k)?S.bm.filter(x=>x!==k):S.bm.concat(k);ls.s('bxb',JSON.stringify(S.bm));view()}
+ else if(e.target.id==='nx'){newQ();view()}});
+document.addEventListener('change',e=>{if(e.target.dataset.s){S[e.target.dataset.s]=e.target.value;view()}});
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',view);new MutationObserver(view).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+rs();apply();view();
+
+</script>
+</body>
+</html>
