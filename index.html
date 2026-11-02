@@ -5,6 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Brain explorer</title>
+<meta name="description" content="An interactive, schematic 3D brain for learning: regions, functions, networks, conditions, substances and medications. Educational use only.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600&family=Bitter:wght@500;700&display=swap">
 <style>
 :root{--bg:#EEF1F4;--surface:#fff;--ink:#1A2233;--muted:#586175;--line:#CCD3DE;--accent:#7A2E65;--accent-ink:#fff;--l:78%;--tint:#F3E7EF;
@@ -25,6 +26,7 @@ select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:8px
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .row{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.8rem}
 .stage{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.5rem;margin-bottom:.8rem}
+.stagewrap{position:relative}
 svg{width:100%;height:auto;display:block;max-height:60vh}
 .reg{cursor:pointer;fill:hsl(var(--h) 40% var(--l));stroke:var(--surface);stroke-width:2;transition:opacity .15s}
 .dim{opacity:.2}
@@ -42,29 +44,156 @@ a{color:var(--accent)}
 canvas{width:100%;height:56vh;min-height:300px;display:block;touch-action:none;border-radius:8px;cursor:grab}canvas:active{cursor:grabbing}
 input[type=range]{width:100%;min-height:32px}input[type=search],textarea{width:100%;font:inherit;color:inherit;border:1px solid var(--line);border-radius:8px;padding:.5rem .6rem;background:var(--surface);min-height:44px}
 .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:.8rem}.cols .panel{margin-bottom:0}.ctl{display:grid;gap:.5rem}.ctl label{display:block}[hidden]{display:none!important}
+/* 3D floating labels */
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.blabel{position:absolute;left:0;top:0;transform:translate(-50%,-130%);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:.08rem .55rem;font-size:.72rem;font-weight:600;white-space:nowrap;display:flex;gap:.32rem;align-items:center;opacity:.96}
+.blabel i{width:.6em;height:.6em;border-radius:50%;display:inline-block;flex:none}
+.blabel.deep{border-style:dashed}
+.blabel.strong{border-color:var(--accent);box-shadow:0 1px 6px rgba(0,0,0,.18)}
+/* pathway legend */
+.lg{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem}
+.lg button{min-height:32px;padding:.15rem .6rem;font-size:.78rem;display:flex;align-items:center;gap:.35rem}
+.lg button i{width:.7em;height:.7em;border-radius:50%;display:inline-block}
+.lg .off{opacity:.4}
+/* cross-link mini buttons */
+.mini{min-height:30px;padding:.12rem .6rem;font-size:.8rem;margin:.12rem .15rem .12rem 0}
+span.mini{display:inline-flex;align-items:center;gap:.32rem;cursor:default}
+.mini i{width:.7em;height:.7em;border-radius:50%;display:inline-block}
+.copylink{min-height:30px;padding:.12rem .6rem;font-size:.8rem;margin-left:.3rem}
+/* warnings and notes */
+.warn{border-left:4px solid var(--accent);background:var(--tint);padding:.6rem .8rem;border-radius:6px;font-size:.9rem;margin:.6rem 0}
+/* glossary */
+.gbtn{border:none;background:none;padding:0;min-height:0;color:var(--accent);text-decoration:underline dotted;border-radius:0;font-weight:inherit}
+.gentry{margin:.45rem 0}
+.gentry .gdef{display:none;margin:.15rem 0 0;font-size:.92rem;color:var(--ink)}
+.gentry.open .gdef{display:block}
+.gentry.flash{outline:2px solid var(--accent);border-radius:6px}
+.gterm{font-weight:600}
+/* search results */
+.results .rh{font-weight:600;margin:.55rem 0 .1rem;font-family:Bitter,Georgia,serif;font-size:.95rem}
+.results .rrow{display:block;width:100%;text-align:left;border:none;background:none;padding:.25rem .4rem;min-height:0;border-radius:6px}
+.results .rrow:hover{background:var(--tint)}
+.results .rrow .rd{display:block;color:var(--muted);font-size:.85rem}
+/* tour */
+.tourp{border:2px solid var(--accent)}
+.tourp .tsteps{display:flex;gap:.4rem;align-items:center;margin-top:.6rem}
+.tourp .tprog{font-size:.85rem;color:var(--muted);margin-right:auto}
+/* quiz system buttons */
+.qsys{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.4rem}
+/* bookmark stars on entity chips */
+[data-r],[data-e]{max-width:100%;text-align:center}
+/* print summary */
+#printsheet{display:none}
+@media print{body{background:#fff;color:#000}.wrap{display:none!important}#printsheet{display:block;font:12pt/1.5 Georgia,'Times New Roman',serif;color:#000}#printsheet h1{font-size:20pt;margin:0 0 6pt}#printsheet h2{font-size:15pt;margin:12pt 0 4pt}#printsheet h3{font-size:12pt;margin:10pt 0 2pt}#printsheet p{margin:5pt 0}#printsheet ul{margin:4pt 0;padding-left:16pt}#printsheet .psmeta{color:#555;border-bottom:.5pt solid #999;padding-bottom:8pt;margin-bottom:10pt;font-size:10pt}}
+@media (max-width:480px){h1{font-size:1.35rem}.blabel{font-size:.66rem}}
 </style>
 </head>
 <body>
 <div class="wrap">
 <h1>Brain explorer</h1>
-<p class="sub">A schematic left hemisphere in 3D. Drag to rotate, then use Internal view or the slice controls to reach deeper structures. Explore by region, function or network to see why "one region, one job" is a poor model.</p>
+<p class="sub">A schematic brain in 3D. Drag to rotate, then use Internal view or the slice controls to reach deeper structures. Explore by region, function or network — and see how conditions, substances and medications map onto the same circuits. Follow how the brain changes across life, and put popular claims to the test.</p>
+<div id="tour" hidden></div>
 <div class="row" role="group" aria-label="Lens" id="modes"></div>
 <div id="pick"></div>
-<div class="stage"><canvas id="cv" tabindex="0" role="img" aria-label="Interactive 3D schematic of the left hemisphere and deep structures. Arrow keys rotate and plus or minus zoom. Every structure is also available as a button below."></canvas></div>
+<div class="stage">
+  <div class="stagewrap">
+    <canvas id="cv" tabindex="0" role="img" aria-label="Interactive 3D schematic of the brain and deep structures. Arrow keys rotate and plus or minus zoom. Every structure is also available as a button below."></canvas>
+    <div id="labels" aria-hidden="true"></div>
+  </div>
+  <div class="lg" id="legend" hidden></div>
+</div>
 <div class="row" id="vw" role="group" aria-label="View"></div>
 <div class="panel ctl"><button id="int" aria-pressed="false">Internal view</button><label class="muted">Cortex opacity<input type="range" id="op" min="10" max="100" value="100"></label><label class="muted">Slice<select id="ax"><option value="none">No slice</option><option value="x">Side to side (sagittal)</option><option value="z">Front to back (coronal)</option><option value="y">Top to bottom (axial)</option></select></label><label class="muted">Slice position<input type="range" id="cut" min="0" max="100" value="100"></label><label class="muted"><input type="checkbox" id="both" checked> Show both hemispheres</label></div>
-<input type="search" id="q" placeholder="Search structures or functions" aria-label="Search structures or functions"><br><br>
-<div class="row" id="chips" role="group" aria-label="Regions"></div>
+<input type="search" id="q" placeholder="Search structures, conditions, substances…" aria-label="Search structures, conditions, substances, case studies and glossary">
+<div class="panel results" id="results" hidden></div>
+<div class="row" id="chips" role="group" aria-label="Entities"></div>
 <div id="info" aria-live="polite"></div>
+<details class="refs" id="glossd"><summary>Glossary</summary><div id="gloss"></div></details>
 <details class="refs"><summary>References</summary><div id="refs"></div></details>
-<p class="muted">Educational summary, not clinical guidance. Shapes, sizes and positions are schematic and approximate. Cortical regions use simple boundaries, and the right hemisphere is a mirror image.</p>
+<p class="muted">Educational summary, not clinical or medical advice. Shapes, sizes and positions are schematic and approximate. Cortical regions use simple boundaries, and the right hemisphere is a mirror image. Condition and substance summaries are orientation, never diagnosis or treatment guidance — speak to a qualified clinician about medication, and seek local support services if substance use feels hard to control.</p>
 </div>
+<div id="printsheet" aria-hidden="true"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
+/* ============================================================
+   BRAIN EXPLORER 3D — upgraded educational edition
+   Single-file app. Sections:
+   1. References        2. Structures        3. Functions & networks
+   4. Conditions        5. Substances        6. Case studies
+   7. Glossary          8. Guided tour       9. 3D scene
+   10. Lenses & state   11. Events
+   Educational use only; not clinical guidance.
+   ============================================================ */
+
+/* ---------- 1. REFERENCES ---------- */
+const REFS={
+corbetta2002:'Corbetta, M., & Shulman, G. L. (2002). Control of goal-directed and stimulus-driven attention in the brain. <i>Nature Reviews Neuroscience, 3</i>(3), 201–215. https://doi.org/10.1038/nrn755',
+diamond2013:'Diamond, A. (2013). Executive functions. <i>Annual Review of Psychology, 64</i>, 135–168. https://doi.org/10.1146/annurev-psych-113011-143750',
+pessoa2008:'Pessoa, L. (2008). On the relationship between emotion and cognition. <i>Nature Reviews Neuroscience, 9</i>(2), 148–158. https://doi.org/10.1038/nrn2317',
+poldrack2006:'Poldrack, R. A. (2006). Can cognitive processes be inferred from neuroimaging data? <i>Trends in Cognitive Sciences, 10</i>(2), 59–63. https://doi.org/10.1016/j.tics.2005.12.004',
+raichle2015:'Raichle, M. E. (2015). The brain\u2019s default mode network. <i>Annual Review of Neuroscience, 38</i>, 433–447. https://doi.org/10.1146/annurev-neuro-071013-014030',
+schmahmann1998:'Schmahmann, J. D., & Sherman, J. C. (1998). The cerebellar cognitive affective syndrome. <i>Brain, 121</i>(4), 561–579. https://doi.org/10.1093/brain/121.4.561',
+scoville1957:'Scoville, W. B., & Milner, B. (1957). Loss of recent memory after bilateral hippocampal lesions. <i>Journal of Neurology, Neurosurgery & Psychiatry, 20</i>(1), 11–21. https://doi.org/10.1136/jnnp.20.1.11',
+seeley2007:'Seeley, W. W., Menon, V., Schatzberg, A. F., Keller, J., Glover, G. H., Kenna, H., Reiss, A. L., & Greicius, M. D. (2007). Dissociable intrinsic connectivity networks for salience processing and executive control. <i>Journal of Neuroscience, 27</i>(9), 2349–2356. https://doi.org/10.1523/JNEUROSCI.5587-06.2007',
+yeo2011:'Yeo, B. T. T., Krienen, F. M., Sepulcre, J., Sabuncu, M. R., Lashkari, D., Hollinshead, M., Roffman, J. L., Smoller, J. W., Zöllei, L., Polimeni, J. R., Fischl, B., Liu, H., & Buckner, R. L. (2011). The organization of the human cerebral cortex estimated by intrinsic functional connectivity. <i>Journal of Neurophysiology, 106</i>(3), 1125–1165. https://doi.org/10.1152/jn.00338.2011',
+adolphs1994:'Adolphs, R., Tranel, D., Damasio, H., & Damasio, A. (1994). Impaired recognition of emotion in facial expressions following bilateral damage to the human amygdala. <i>Nature, 372</i>(6507), 669–672. https://doi.org/10.1038/372669a0',
+alexander1986:'Alexander, G. E., DeLong, M. R., & Strick, P. L. (1986). Parallel organization of functionally segregated circuits linking basal ganglia and cortex. <i>Annual Review of Neuroscience, 9</i>, 357–381. https://doi.org/10.1146/annurev.ne.09.030186.002041',
+craig2009:'Craig, A. D. (2009). How do you feel — now? The anterior insula and human awareness. <i>Nature Reviews Neuroscience, 10</i>(1), 59–70. https://doi.org/10.1038/nrn2555',
+gazzaniga2005:'Gazzaniga, M. S. (2005). Forty-five years of split-brain research and still going strong. <i>Nature Reviews Neuroscience, 6</i>(8), 653–659. https://doi.org/10.1038/nrn1723',
+poldrack2017:'Poldrack, R. A., Baker, C. I., Durnez, J., Gorgolewski, K. J., Matthews, P. M., Munafò, M. R., Nichols, T. E., Poline, J.-B., Vul, E., & Yarkoni, T. (2017). Scanning the horizon: Towards transparent and reproducible neuroimaging research. <i>Nature Reviews Neuroscience, 18</i>(2), 115–126. https://doi.org/10.1038/nrn.2016.167',
+saper2014:'Saper, C. B., & Lowell, B. B. (2014). The hypothalamus. <i>Current Biology, 24</i>(23), R1111–R1116. https://doi.org/10.1016/j.cub.2014.10.023',
+shackman2011:'Shackman, A. J., Salomons, T. V., Slagter, H. A., Fox, A. S., Winter, J. J., & Davidson, R. J. (2011). The integration of negative affect, pain and cognitive control in the cingulate cortex. <i>Nature Reviews Neuroscience, 12</i>(3), 154–167. https://doi.org/10.1038/nrn2994',
+kalia2015:'Kalia, L. V., & Lang, A. E. (2015). Parkinson\u2019s disease. <i>The Lancet, 386</i>(9996), 896–912. https://doi.org/10.1016/S0140-6736(14)61393-3',
+long2019:'Long, J. M., & Holtzman, D. M. (2019). Alzheimer disease: An update on pathobiology and treatment strategies. <i>Cell, 179</i>(2), 312–333. https://doi.org/10.1016/j.cell.2019.09.001',
+thijs2019:'Thijs, R. D., Surges, R., O\u2019Brien, T. J., & Sander, J. W. (2019). Epilepsy in adults. <i>The Lancet, 393</i>(10172), 689–701. https://doi.org/10.1016/S0140-6736(18)32596-0',
+campbell2020:'Campbell, B. C. V., & Khatri, P. (2020). Stroke. <i>The Lancet, 396</i>(10244), 129–142. https://doi.org/10.1016/S0140-6736(20)31179-X',
+thompson2018:'Thompson, A. J., Baranzini, S. E., Geurts, J., Hemmer, B., & Ciccarelli, O. (2018). Multiple sclerosis. <i>The Lancet, 391</i>(10130), 1622–1636. https://doi.org/10.1016/S0140-6736(18)30481-1',
+walker2007:'Walker, F. O. (2007). Huntington\u2019s disease. <i>The Lancet, 369</i>(9557), 218–228. https://doi.org/10.1016/S0140-6736(07)60111-1',
+otte2016:'Otte, C., Gold, S. M., Penninx, B. W., Pariante, C. M., Etkin, A., Fava, M., Mohr, D. C., & Schatzberg, A. F. (2016). Major depressive disorder. <i>Nature Reviews Disease Primers, 2</i>, 16065. https://doi.org/10.1038/nrdp.2016.65',
+craske2017:'Craske, M. G., Stein, M. B., Eley, T. C., Milad, M. R., Holmes, A., Rapee, R. M., & Wolitzky-Taylor, K. B. (2017). Anxiety disorders. <i>Nature Reviews Disease Primers, 3</i>, 17024. https://doi.org/10.1038/nrdp.2017.24',
+yehuda2015:'Yehuda, R., Hoge, C. W., McFarlane, A. C., Vermetten, E., Lanius, R. A., Nievergelt, C. M., Hobfoll, S. E., Koenen, K. C., Neylan, T. C., & Hyman, S. E. (2015). Post-traumatic stress disorder. <i>Nature Reviews Disease Primers, 1</i>, 15057. https://doi.org/10.1038/nrdp.2015.57',
+milad2012:'Milad, M. R., & Rauch, S. L. (2012). Obsessive-compulsive disorder: Beyond segregated cortico-striatal pathways. <i>Trends in Cognitive Sciences, 16</i>(1), 43–51. https://doi.org/10.1016/j.tics.2011.11.003',
+faraone2015:'Faraone, S. V., Asherson, P., Banaschewski, T., Biederman, J., Buitelaar, J. K., Ramos-Quiroga, J. A., Rohde, L. A., Sonuga-Barke, E. J. S., Tannock, R., & Franke, B. (2015). Attention-deficit/hyperactivity disorder. <i>Nature Reviews Disease Primers, 1</i>, 15020. https://doi.org/10.1038/nrdp.2015.20',
+owen2016:'Owen, M. J., Sawa, A., & Mortensen, P. B. (2016). Schizophrenia. <i>The Lancet, 388</i>(10039), 86–97. https://doi.org/10.1016/S0140-6736(15)01121-6',
+mcintyre2020:'McIntyre, R. S., Berk, M., Brietzke, E., Goldstein, B. I., López-Jaramillo, C., Kessing, L. V., Malhi, G. S., Nierenberg, A. A., Rosenblat, J. D., Majeed, A., Vieta, E., Vinberg, M., Young, A. H., & Mansur, R. B. (2020). Bipolar disorders. <i>The Lancet, 396</i>(10265), 1841–1856. https://doi.org/10.1016/S0140-6736(20)31544-0',
+lord2018:'Lord, C., Elsabbagh, M., Baird, G., & Veenstra-Vanderweele, J. (2018). Autism spectrum disorder. <i>The Lancet, 392</i>(10146), 508–520. https://doi.org/10.1016/S0140-6736(18)31129-2',
+maas2017:'Maas, A. I. R., Menon, D. K., Adelson, P. D., Andelic, N., Bell, M. J., Belli, A., et al. (2017). Traumatic brain injury: Integrated approaches to improve prevention, clinical care, and research. <i>The Lancet Neurology, 16</i>(12), 987–1048. https://doi.org/10.1016/S1474-4422(17)30371-X',
+mez2017:'Mez, J., Daneshvar, D. H., Kiernan, P. T., Abdolmohammadi, B., Alvarez, V. E., Huber, B. R., et al. (2017). Clinicopathological evaluation of chronic traumatic encephalopathy in players of American football. <i>JAMA, 318</i>(4), 360–370. https://doi.org/10.1001/jama.2017.8334',
+riemann2010:'Riemann, D., Spiegelhalder, K., Feige, B., Voderholzer, U., Berger, M., Perlis, M., & Nissen, C. (2010). The hyperarousal model of insomnia: A review of the concept and its evidence. <i>Sleep Medicine Reviews, 14</i>(1), 19–31.',
+scammell2015:'Scammell, T. E. (2015). Narcolepsy. <i>New England Journal of Medicine, 373</i>(27), 2654–2662. https://doi.org/10.1056/NEJMra1500587',
+volkow2016:'Volkow, N. D., Koob, G. F., & McLellan, A. T. (2016). Neurobiologic advances from the brain disease model of addiction. <i>New England Journal of Medicine, 374</i>(4), 363–371. https://doi.org/10.1056/NEJMra1511480',
+koob2016:'Koob, G. F., & Volkow, N. D. (2016). Neurobiology of addiction: A neurocircuitry analysis. <i>The Lancet Psychiatry, 3</i>(8), 760–773. https://doi.org/10.1016/S2215-0366(16)00104-8',
+volkow2014:'Volkow, N. D., Baler, R. D., Compton, W. M., & Weiss, S. R. B. (2014). Adverse health effects of marijuana use. <i>New England Journal of Medicine, 370</i>(23), 2219–2227. https://doi.org/10.1056/NEJMra1307444',
+benowitz2010:'Benowitz, N. L. (2010). Nicotine addiction. <i>New England Journal of Medicine, 362</i>(24), 2295–2303. https://doi.org/10.1056/NEJMra0809890',
+fredholm1999:'Fredholm, B. B., Bättig, K., Holmén, J., Nehlig, A., & Zvartau, E. E. (1999). Actions of caffeine in the brain with special reference to factors that contribute to its widespread use. <i>Pharmacological Reviews, 51</i>(1), 83–133.',
+darcq2018:'Darcq, E., & Kieffer, B. L. (2018). Opioid receptors: Drivers to addiction? <i>Nature Reviews Neuroscience, 19</i>(8), 499–514. https://doi.org/10.1038/s41583-018-0028-x',
+nutt2007:'Nutt, D. J., King, L. A., Saulsbury, W., & Blakemore, C. (2007). Development of a rational scale to assess the harm of drugs of potential misuse. <i>The Lancet, 369</i>(9566), 1047–1053. https://doi.org/10.1016/S0140-6736(07)60464-4',
+carhart2019:'Carhart-Harris, R. L., & Friston, K. J. (2019). REBUS and the anarchic brain: Toward a unified model of the brain action of psychedelics. <i>Pharmacological Reviews, 71</i>(3), 316–344. https://doi.org/10.1124/pr.118.017160',
+zanos2018:'Zanos, P., & Gould, T. D. (2018). Mechanisms of ketamine action as an antidepressant. <i>Molecular Psychiatry, 23</i>(4), 801–811. https://doi.org/10.1038/mp.2017.255',
+harmer2017:'Harmer, C. J., Duman, R. S., & Roth, B. L. (2017). How do antidepressants work? New perspectives for refining future treatment approaches. <i>The Lancet Psychiatry, 4</i>(5), 409–418. https://doi.org/10.1016/S2215-0366(17)30015-9',
+miyamoto2012:'Miyamoto, S., Miyake, N., Jarskog, L. F., Fleischhacker, W. W., & Lieberman, J. A. (2012). Pharmacological treatment of schizophrenia: A critical review of the pharmacology and clinical effects of current and future therapeutic agents. <i>Molecular Psychiatry, 17</i>(12), 1206–1227. https://doi.org/10.1038/mp.2012.47',
+malhi2013:'Malhi, G. S., Tanious, M., Das, P., Coulston, C. M., & Berk, M. (2013). Potential mechanisms of action of lithium in bipolar disorder: Current understanding. <i>CNS Drugs, 27</i>(2), 135–153.',
+griffin2013:'Griffin, C. E., Kaye, A. M., Bueno, F. R., & Kaye, A. D. (2013). Benzodiazepine pharmacology and central nervous system–mediated effects. <i>Ochsner Journal, 13</i>(2), 214–223.',
+volkow2001:'Volkow, N. D., Wang, G.-J., Fowler, J. S., Logan, J., Gatley, S. J., Wong, C., Hitzemann, R., & Pappas, N. R. (2001). Therapeutic doses of oral methylphenidate significantly increase extracellular dopamine in the human brain. <i>Journal of Neuroscience, 21</i>(2), RC121.',
+schultz1997:'Schultz, W., Dayan, P., & Montague, P. R. (1997). A neural substrate of prediction and reward. <i>Science, 275</i>(5306), 1593–1599. https://doi.org/10.1126/science.275.5306.1593',
+astonjones2005:'Aston-Jones, G., & Cohen, J. D. (2005). An integrative theory of locus coeruleus–norepinephrine function: Adaptive gain and optimal performance. <i>Annual Review of Neuroscience, 28</i>, 403–450. https://doi.org/10.1146/annurev.neuro.28.061604.135709',
+jacobs1992:'Jacobs, B. L., & Azmitia, E. C. (1992). Structure and function of the brain serotonin system. <i>Physiological Reviews, 72</i>(1), 165–229. https://doi.org/10.1152/physrev.1992.72.1.165',
+saper2005:'Saper, C. B., Scammell, T. E., & Lu, J. (2005). Hypothalamic regulation of sleep and circadian rhythms. <i>Nature, 437</i>(7063), 1257–1263. https://doi.org/10.1038/nature04184',
+damasio1994:'Damasio, H., Grabowski, T., Frank, R., Galaburda, A. M., & Damasio, A. R. (1994). The return of Phineas Gage: Clues about the brain from the skull of a famous patient. <i>Science, 264</i>(5162), 1102–1105. https://doi.org/10.1126/science.8178168',
+dronkers2007:'Dronkers, N. F., Plaisant, O., Iba-Zizen, M. T., & Cabanis, E. A. (2007). Paul Broca\u2019s historic cases: High resolution MR imaging of the brains of Leborgne and Lelong. <i>Brain, 130</i>(5), 1432–1441. https://doi.org/10.1093/brain/awm042',
+casey2008:'Casey, B. J., Jones, R. M., & Hare, T. A. (2008). The adolescent brain. <i>Annals of the New York Academy of Sciences, 1124</i>, 111–126. https://doi.org/10.1196/annals.1440.010',
+livingston2020:'Livingston, G., Huntley, J., Sommerlad, A., Ames, D., Ballard, C., Banerjee, S., et al. (2020). Dementia prevention, intervention, and care: 2020 report of the Lancet Commission. <i>The Lancet, 396</i>(10248), 1702–1746. https://doi.org/10.1016/S0140-6736(20)30367-6',
+pashler2008:'Pashler, H., McDaniel, M., Rohrer, D., & Bjork, R. (2008). Learning styles: Concepts and evidence. <i>Psychological Science in the Public Interest, 9</i>(3), 105–119. https://doi.org/10.1111/j.1539-6053.2009.01038.x',
+simons2016:'Simons, D. J., Boot, W. R., Charness, N., Gathercole, S. E., Chabris, C. F., Hambrick, D. Z., & Stine-Morrow, E. A. L. (2016). Do \u201cbrain-training\u201d programs work? <i>Psychological Science in the Public Interest, 17</i>(3), 103–186. https://doi.org/10.1177/1529100616661983'
+};
+
+/* ---------- 2. STRUCTURES ---------- */
+/* n name, h hue (for colour), fn often-associated functions, ef executive-function note,
+   les lesion/damage note, quiz primary structure used by the Conditions quiz. */
 const R={
-pfc:{n:'Prefrontal cortex',h:215,fn:['Planning and keeping goals in mind','Working memory','Inhibiting impulses and switching strategy','Speech production (left inferior frontal region, including Broca\'s area)','Social and self-related thinking (medial parts)'],
+pfc:{n:'Prefrontal cortex',h:215,fn:['Planning and keeping goals in mind','Working memory','Inhibiting impulses and switching strategy','Speech production (left inferior frontal region, including Broca\u2019s area)','Social and self-related thinking (medial parts)'],
  ef:'Supports all three core executive functions described by Diamond (2013): inhibition, working memory and cognitive flexibility, plus the planning and reasoning built on them.',
- les:'Damage can produce dysexecutive problems such as disorganisation, impulsivity and perseveration. Left inferior frontal damage is classically linked to non-fluent (Broca\'s) aphasia, though the picture is more complex than one area.'},
+ les:'Damage can produce dysexecutive problems such as disorganisation, impulsivity and perseveration. Left inferior frontal damage is classically linked to non-fluent (Broca\u2019s) aphasia, though the picture is more complex than one area.'},
 motor:{n:'Motor and premotor cortex',h:160,fn:['Voluntary movement (primary motor cortex, precentral gyrus)','Planning and sequencing actions (premotor cortex)','Eye-movement control (frontal eye fields at the premotor border)','Articulation of speech'],
  ef:'Stopping a prepared action involves frontal motor-related circuits, including medial areas not drawn here. Direct executive roles are less clear than for prefrontal cortex.',
  les:'Primary motor damage typically causes weakness on the opposite side of the body. Premotor or parietal damage can disrupt skilled, sequenced movement (apraxia).'},
@@ -76,8 +205,8 @@ par:{n:'Parietal cortex',h:40,fn:['Directing spatial attention','Combining senso
  les:'Right parietal damage is classically linked to hemispatial neglect of the left side of space.'},
 temp:{n:'Temporal cortex',h:18,fn:['Hearing and sound processing (superior temporal)','Understanding speech and words (left posterior regions)','Recognising objects and faces (ventral surface)','Long-term memory (medial temporal lobe, not visible here)'],
  ef:'Largely indirect: language comprehension and memory retrieval provide content that executive processes then select and manipulate.',
- les:'Left posterior temporal damage is classically linked to fluent (Wernicke\'s) aphasia. Medial temporal damage causes profound new-memory loss, as in patient H.M. (Scoville & Milner, 1957).'},
-occ:{n:'Occipital cortex',h:280,fn:['First stages of visual processing (primary visual cortex)','Edges, orientation, colour and motion','Feeding two visual pathways: "what" (ventral) and "where/how" (dorsal)'],
+ les:'Left posterior temporal damage is classically linked to fluent (Wernicke\u2019s) aphasia. Medial temporal damage causes profound new-memory loss, as in patient H.M. (Scoville & Milner, 1957).'},
+occ:{n:'Occipital cortex',h:280,fn:['First stages of visual processing (primary visual cortex)','Edges, orientation, colour and motion','Feeding two visual pathways: \u201cwhat\u201d (ventral) and \u201cwhere/how\u201d (dorsal)'],
  ef:'Not an executive region. Visual input is what attentional control selects among.',
  les:'Damage can cause visual field loss or cortical blindness. More anterior occipitotemporal damage can impair recognition (visual agnosia).'},
 cb:{n:'Cerebellum',h:335,fn:['Coordination and balance','Timing and fine-tuning of movement','Learning skilled movements','Contributions to language, attention and emotion regulation'],
@@ -85,59 +214,454 @@ cb:{n:'Cerebellum',h:335,fn:['Coordination and balance','Timing and fine-tuning 
  les:'Damage commonly causes unsteady gait and poorly scaled movements (ataxia, dysmetria). Cognitive and affective changes are also reported.'},
 bs:{n:'Brainstem',h:200,fn:['Arousal and sleep-wake regulation (reticular formation)','Breathing and heart-rate control','Relaying signals between brain and body','Cranial nerve nuclei'],
  ef:'Sets baseline alertness, a precondition for sustained attention rather than an executive process itself.',
- les:'Small lesions can have large effects, including disordered consciousness, and locked-in syndrome after ventral pontine damage.'}};
-const FN={'Executive control':['pfc','par','cb'],'Working memory':['pfc','par'],'Attention':['par','pfc','motor'],'Language':['pfc','temp','par','motor'],'Memory':['temp','pfc'],'Vision':['occ','temp','par'],'Movement':['motor','sens','par','cb'],'Touch and body sense':['sens','par'],'Hearing':['temp'],'Arousal and alertness':['bs']};
-const NET={'Visual':['occ'],'Somatomotor':['motor','sens','temp'],'Dorsal attention':['par','motor'],'Ventral attention / salience':['pfc','par','temp'],'Frontoparietal control':['pfc','par'],'Default mode':['pfc','par','temp']};
-const NETD={'Visual':'Processes visual input; centred on occipital cortex.','Somatomotor':'Movement and touch. In this parcellation it also includes auditory cortex.','Dorsal attention':'Voluntary, goal-directed orienting of attention (Corbetta & Shulman, 2002).','Ventral attention / salience':'Detecting behaviourally relevant or unexpected events. Anterior insula and cingulate are core nodes (Seeley et al., 2007) but are not visible from the side.','Frontoparietal control':'Flexible, goal-directed control that couples with other networks depending on the task.','Default mode':'More active at rest and during self-referential thought and memory (Raichle, 2015).'};
+ les:'Small lesions can have large effects, including disordered consciousness, and locked-in syndrome after ventral pontine damage.'},
+hip:{n:'Hippocampus',h:50,fn:['Forming new episodic memories','Spatial memory and navigation','Linking events to their context','Memory consolidation'],
+ ef:'Not an executive region, but it supplies episodic and contextual information that prefrontal control selects and uses during retrieval.',
+ les:'Bilateral medial temporal damage causes profound loss of new memories, as in patient H.M. (Scoville & Milner, 1957).'},
+amy:{n:'Amygdala',h:0,fn:['Detecting emotionally significant stimuli','Emotional learning, including fear conditioning','Modulating memory for emotional events','Processing social and facial emotion cues'],
+ ef:'Interacts with prefrontal regions in emotion regulation. Emotion and cognition are better seen as integrated than separate (Pessoa, 2008).',
+ les:'Bilateral damage has been linked to impaired recognition of fear in faces (Adolphs et al., 1994); effects vary with lesion extent.'},
+thal:{n:'Thalamus',h:120,fn:['Relaying sensory signals to cortex (except smell)','Gating attention and arousal','Relaying motor loops via basal ganglia and cerebellum','Looping with prefrontal cortex in higher-order functions'],
+ ef:'Higher-order nuclei form loops with prefrontal cortex and contribute to attention and working memory. Evidence is less direct than for cortex.',
+ les:'Thalamic stroke can cause sensory loss, altered consciousness, and memory or executive problems, depending on the nuclei affected.'},
+bg:{n:'Basal ganglia',h:245,fn:['Selecting and initiating actions','Habit and procedural learning','Reward-based learning (dopamine)','Cognitive and motivational loops with prefrontal cortex'],
+ ef:'Parallel loops link basal ganglia with prefrontal cortex (Alexander et al., 1986) and are thought to support selecting actions and cognitive content.',
+ les:'Parkinson\u2019s disease involves loss of dopamine inputs, causing slowed movement, tremor and rigidity. Huntington\u2019s disease affects caudate and putamen.'},
+ins:{n:'Insula',h:70,fn:['Interoception (sensing internal bodily state)','Awareness of feelings and bodily states','Salience detection (anterior insula)','Taste and pain processing'],
+ ef:'Anterior insula is a core salience-network node that helps switch between large-scale networks (Seeley et al., 2007; Craig, 2009).',
+ les:'Damage can alter pain, taste and awareness of bodily and emotional states. Lesions rarely respect its boundaries, so effects vary.'},
+cin:{n:'Cingulate cortex',h:310,fn:['Monitoring conflict and errors','Linking pain and negative affect with control','Motivation and effort (anterior)','Self-referential processing and memory (posterior)'],
+ ef:'Anterior cingulate is implicated in cognitive control and monitoring (Shackman et al., 2011). Posterior cingulate is a default mode hub.',
+ les:'Large anterior cingulate lesions are linked to reduced spontaneous behaviour (akinetic mutism), though such cases are rare.'},
+cc:{n:'Corpus callosum',h:175,fn:['Connecting the two hemispheres','Integrating information across the midline','Coordinating bilateral movement and attention'],
+ ef:'White matter, not a processing region. It supports interhemispheric integration when tasks recruit both prefrontal cortices.',
+ les:'Surgical severing (split-brain procedure) disconnects the hemispheres in certain tasks (Gazzaniga, 2005).'},
+hyp:{n:'Hypothalamus',h:25,fn:['Homeostasis: temperature, hunger, thirst','Controlling the pituitary and stress hormones','Sleep-wake and circadian regulation','Motivated behaviours such as feeding'],
+ ef:'Not an executive region. It sets internal states (hunger, stress) that influence cognitive control indirectly.',
+ les:'Damage can disrupt appetite, temperature control, sleep and hormonal regulation (Saper & Lowell, 2014).'},
+vta:{n:'Ventral tegmental area (VTA)',h:20,fn:['Source of the brain\u2019s main reward signal (dopamine)','Reward prediction and learning, with the basal ganglia','Motivation and effort','Teaching the value of cues and actions'],
+ ef:'Projects dopamine to prefrontal cortex and ventral striatum. It shapes motivation and value learning — a background process that biases executive choices rather than a control region itself.',
+ les:'Rarely damaged in isolation. In animal studies, disruption causes severe loss of motivation and reward learning. Overactive dopamine signalling here is implicated in psychotic symptoms (Owen et al., 2016).',refs:['schultz1997']},
+sn:{n:'Substantia nigra',h:35,fn:['Dopamine supply to the dorsal striatum','Movement initiation via basal ganglia loops','Action selection and habit learning'],
+ ef:'Indirect: by gating basal ganglia output it enables fluent execution of plans formed elsewhere.',
+ les:'Degeneration of its dopamine neurons produces Parkinson\u2019s disease — slowed movement, tremor and rigidity (Kalia & Lang, 2015).',refs:['kalia2015']},
+nac:{n:'Nucleus accumbens',h:55,fn:['Reward and pleasure processing (ventral striatum)','Learning which cues predict reward','Motivational \u201cwanting\u201d and effort','Integrating emotion with action'],
+ ef:'Interfaces limbic motivation with action selection, feeding value signals into the basal ganglia loops that prefrontal cortex uses to guide behaviour.',
+ les:'Deep brain stimulation here has been trialled for severe depression and obsessive-compulsive disorder, with mixed results. Animal lesions reduce motivated behaviour.',refs:['koob2016']},
+lc:{n:'Locus coeruleus',h:145,fn:['Main source of brain noradrenaline','Arousal, alertness and vigilance','Setting the \u201cgain\u201d of cortical processing','Stress response'],
+ ef:'Noradrenergic tone tunes cortical processing. Performance sits at a sweet spot of moderate arousal, not maximum (Aston-Jones & Cohen, 2005).',
+ les:'Degeneration is reported in Alzheimer\u2019s and Parkinson\u2019s disease. Noradrenergic overactivity is implicated in hyperarousal after trauma (Yehuda et al., 2015).',refs:['astonjones2005']},
+raphe:{n:'Raphe nuclei',h:260,fn:['Main source of brain serotonin','Mood, sleep-wake and appetite regulation','Modulating impulsivity and behavioural inhibition','Influencing sensory and pain processing'],
+ ef:'Serotonin modulates cortical networks broadly; its role in executive control is indirect, shaping flexibility and inhibition (Jacobs & Azmitia, 1992).',
+ les:'Not commonly damaged in isolation. Experimental serotonin depletion changes mood and impulse control; the idea that depression is simply \u201clow serotonin\u201d is an oversimplification (Harmer et al., 2017).',refs:['jacobs1992']}
+};
+
+/* ---------- 3. FUNCTIONS & NETWORKS ---------- */
+const FN={'Executive control':['pfc','par','cb','cin','bg'],'Working memory':['pfc','par'],'Attention':['par','pfc','motor'],'Language':['pfc','temp','par','motor'],'Memory':['temp','pfc','hip'],'Vision':['occ','temp','par','thal'],'Movement':['motor','sens','par','cb','bg','thal','sn'],'Touch and body sense':['sens','par','thal','ins'],'Hearing':['temp','thal'],'Arousal and alertness':['bs','thal','hyp','lc'],'Emotion and motivation':['amy','hyp','ins','cin','pfc','vta','nac']};
+const NET={'Visual':['occ'],'Somatomotor':['motor','sens','temp'],'Dorsal attention':['par','motor'],'Ventral attention / salience':['pfc','par','temp','ins','cin'],'Frontoparietal control':['pfc','par'],'Default mode':['pfc','par','temp','cin']};
+const NETD={'Visual':'Processes visual input; centred on occipital cortex.','Somatomotor':'Movement and touch. In this parcellation it also includes auditory cortex.','Dorsal attention':'Voluntary, goal-directed orienting of attention (Corbetta & Shulman, 2002).','Ventral attention / salience':'Detecting behaviourally relevant or unexpected events. Anterior insula and cingulate are core nodes (Seeley et al., 2007).','Frontoparietal control':'Flexible, goal-directed control that couples with other networks depending on the task.','Default mode':'More active at rest and during self-referential thought and memory (Raichle, 2015).'};
+/* ---------- 4. CONDITIONS ----------
+   grp: 'Neurological' | 'Psychiatric' | 'Injury & sleep' | 'Addiction'
+   regions: structure ids highlighted on the model. networks: NET keys.
+   systems: neurotransmitter vocabulary. quiz: primary structure for quiz. */
+const GRPS=['Neurological','Psychiatric','Injury & sleep','Addiction'];
+const COND={
+parkinsons:{n:'Parkinson\u2019s disease',grp:'Neurological',regions:['sn','bg','thal','motor','pfc'],networks:[],systems:['dopamine'],quiz:'sn',life:['older'],refs:['kalia2015'],
+ para:'A progressive neurological condition in which dopamine-producing neurons of the substantia nigra degenerate. The resulting dopamine shortfall disrupts cortico-basal ganglia loops, producing the hallmark motor features: tremor at rest, stiffness, slowness and reduced initiation of movement. Balance, sleep, mood and cognition are often affected too, and symptoms typically appear only after a large share of nigral cells has already been lost. Levodopa replaces dopamine, and deep brain stimulation modulates the same loops.'},
+alzheimers:{n:'Alzheimer\u2019s disease',grp:'Neurological',regions:['hip','temp','par','pfc','cc'],networks:['Default mode'],systems:[],quiz:'hip',life:['midlife','older'],refs:['long2019'],
+ para:'The most common cause of dementia, marked by gradual accumulation of amyloid-beta plaques and tau tangles that spread through cortex in a fairly predictable sequence. Early damage concentrates in medial temporal structures — the hippocampus and entorhinal cortex — which is why difficulty forming new memories usually comes first. As pathology spreads into temporal, parietal and default-mode cortical areas, language, orientation and reasoning decline. Cholinergic neurons of the basal forebrain also degenerate, the target of currently available symptomatic drugs.'},
+epilepsy:{n:'Epilepsy',grp:'Neurological',regions:['temp','hip','pfc','motor'],networks:[],systems:['GABA','glutamate'],quiz:'temp',refs:['thijs2019'],
+ para:'A tendency toward recurrent, unprovoked seizures — episodes of hypersynchronous electrical discharge in cortical networks. Focal seizures start in one network, most often the temporal lobe, where hippocampal sclerosis is a common substrate; generalised seizures engage both hemispheres from the outset. The experience depends on where the network is: d\u00e9j\u00e0 vu and rising sensations (temporal), jerking (motor), or altered awareness. Anti-seizure drugs stabilise membranes or boost inhibition; surgery resects the seizure focus when drugs fail.'},
+stroke:{n:'Stroke',grp:'Neurological',regions:['motor','sens','pfc','temp','par','bs'],networks:[],systems:[],quiz:'pfc',refs:['campbell2020'],
+ para:'Sudden loss of blood flow to part of the brain — usually a clot blocking an artery (ischaemic) or a burst vessel (haemorrhagic). What is lost maps onto which territory is starved: a middle cerebral artery stroke on the left typically damages lateral frontal and temporal cortex, causing weakness on the right and aphasia; right parietal strokes often leave neglect of the left side of space. Deep and brainstem strokes can affect arousal, sensation and eye movement. Treatment is fiercely time-sensitive: clot-busting drugs and mechanical clot removal save tissue and function.'},
+ms:{n:'Multiple sclerosis',grp:'Neurological',regions:['cc','par','motor','sens','occ'],networks:[],systems:[],quiz:'cc',refs:['thompson2018'],
+ para:'An immune-mediated condition in which the body\u2019s own defences attack myelin, the fatty insulation of white-matter axons. Lesions scatter across the optic nerves, periventricular white matter, corpus callosum, brainstem and spinal cord, so symptoms vary enormously: blurred vision, numbness, weakness, fatigue and slower processing speed. Because white matter is the connectome\u2019s cabling, MS is best understood as a disconnection condition — networks fail when the wires\u2019 insulation is stripped. Disease-modifying drugs reduce relapse frequency by calming the immune attack.'},
+huntingtons:{n:'Huntington\u2019s disease',grp:'Neurological',regions:['bg','pfc'],networks:[],systems:[],quiz:'bg',refs:['walker2007'],
+ para:'An inherited, progressive neurodegenerative condition caused by an expanded CAG repeat in the huntingtin gene. The most vulnerable cells are medium spiny neurons of the caudate and putamen, so the basal ganglia\u2019s filtering of movement and thought degrades gradually: involuntary writhing movements (chorea), irritability and depression in mid-life, then cognitive decline. Because the mutation is dominant, each child of an affected parent has a 50% chance of inheriting it; predictive genetic testing exists, with no disease-modifying treatment yet.'},
+depression:{n:'Major depression',grp:'Psychiatric',regions:['pfc','cin','amy','hip','ins'],networks:['Default mode','Frontoparietal control','Ventral attention / salience'],systems:['serotonin','noradrenaline','dopamine'],quiz:'pfc',life:['teen','adult'],refs:['otte2016'],
+ para:'A common, heterogeneous mood condition: persistent low mood or loss of pleasure, with changes in sleep, appetite, energy, concentration and self-worth. Neuroimaging implicates interacting networks rather than a single lesion — blunted prefrontal control over subcortical threat, altered anterior cingulate monitoring of effort and conflict, amygdala hyperreactivity, and hippocampal volume reductions that likely reflect chronic stress. The default mode network can be over-engaged in rumination. The monoamine hypothesis inspired most antidepressants but is too simple: medication changes serotonin within hours, while clinical effects take weeks (Harmer et al., 2017).'},
+anxiety:{n:'Anxiety disorders',grp:'Psychiatric',regions:['amy','pfc','cin','ins','hyp'],networks:[],systems:['GABA','noradrenaline'],quiz:'amy',refs:['craske2017'],
+ para:'Anxiety disorders share exaggerated threat detection and difficulty extinguishing learned fear. The amygdala flags danger quickly; medial prefrontal cortex regulates and re-evaluates that response, and the anterior cingulate and insula translate bodily arousal into worry about sensations. The stress axis through the hypothalamus keeps arousal high. Avoidance brings short-term relief but prevents new learning — which is why exposure-based therapy targets the same extinction circuitry that medication modulates.'},
+ptsd:{n:'Post-traumatic stress disorder',grp:'Psychiatric',regions:['amy','hip','pfc','lc'],networks:[],systems:['noradrenaline'],quiz:'amy',refs:['yehuda2015'],
+ para:'After trauma, a minority develop persistent re-experiencing, avoidance, negative mood and hyperarousal. Findings point to a fear circuit out of balance: a sensitised amygdala, a hippocampus that struggles to put memories in context, and medial prefrontal cortex under-activated when inhibition is needed. Noradrenaline from the locus coeruleus keeps arousal high, which may explain exaggerated startle and sleep disruption. The disorder is defined by functional change rather than gross damage, and is treatable — trauma-focused therapy works by re-contextualising fear memories.'},
+ocd:{n:'Obsessive-compulsive disorder',grp:'Psychiatric',regions:['cin','bg','pfc','thal'],networks:[],systems:['serotonin'],quiz:'bg',refs:['milad2012'],
+ para:'Unwanted intrusive thoughts (obsessions) and repetitive rituals (compulsions) that temporarily relieve distress. The classical model implicates cortico-striato-thalamo-cortical loops, especially orbitofrontal cortex and anterior cingulate feeding the caudate: habit machinery gets stuck driving behaviour even when the goal system knows better. Recent work emphasises that multiple loops and cerebellar links are involved (Milad & Rauch, 2012). Higher-dose SSRIs and exposure-with-response-prevention therapy both act on this circuitry.'},
+adhd:{n:'ADHD',grp:'Psychiatric',regions:['pfc','bg','cin','cb'],networks:[],systems:['dopamine','noradrenaline'],quiz:'pfc',life:['middle'],refs:['faraone2015'],
+ para:'A neurodevelopmental condition involving developmentally extreme inattention, impulsivity and/or hyperactivity. The best-supported findings involve fronto-striatal and fronto-cerebellar circuits that support inhibition, timing and working memory, with altered dopamine and noradrenaline signalling; the default mode network also intrudes more during effortful tasks. Stimulant medication raises catecholamine signalling in these circuits and non-stimulants act on noradrenaline. Reported differences are average group differences, not findings about any individual brain.'},
+schizophrenia:{n:'Schizophrenia',grp:'Psychiatric',regions:['vta','bg','pfc','temp','thal','hip'],networks:[],systems:['dopamine','glutamate'],quiz:'vta',life:['teen','adult'],refs:['owen2016'],
+ para:'A condition affecting roughly 1 in 100 people, with positive symptoms (hallucinations, delusions), negative symptoms (reduced motivation and expression) and cognitive difficulties. The dopamine dysregulation hypothesis holds that aberrant salience signalling from midbrain dopamine neurons to striatum and cortex makes irrelevant events feel meaningful — the pathway most clearly linked to psychosis. Structural and functional differences involve prefrontal and temporal cortex, thalamus and hippocampus, and glutamate signalling is increasingly implicated. Antipsychotics block dopamine D2 receptors; psychosocial support remains central.'},
+bipolar:{n:'Bipolar disorder',grp:'Psychiatric',regions:['pfc','amy','hip','thal','cin'],networks:[],systems:['dopamine'],quiz:'pfc',refs:['mcintyre2020','malhi2013'],
+ para:'Recurring episodes of mania or hypomania — elevated mood, reduced need for sleep, grandiosity, impulsivity — usually alternating with depression. Candidate mechanisms implicate cortico-limbic regulation: prefrontal areas that normally rein in emotional responses show altered activity relative to the amygdala and striatum, and circadian rhythm instability is central to episode triggering. Lithium remains the benchmark mood stabiliser; its cellular mechanisms are multiple and still being mapped (Malhi et al., 2013).'},
+autism:{n:'Autism spectrum condition',grp:'Psychiatric',regions:['pfc','temp','amy','nac','cc'],networks:[],systems:[],quiz:'amy',refs:['lord2018'],
+ para:'A neurodevelopmental condition characterised by differences in social communication and interaction, alongside restricted, repetitive patterns of behaviour and unusually intense interests or sensory experiences. It is highly heterogeneous and strongly genetic. Research has explored differences in face and voice processing (temporal cortex), social-reward circuits (amygdala, ventral striatum), and connectivity between frontal and posterior areas, but findings are mixed and no brain-based test exists. Support is increasingly framed around each person\u2019s own goals and environment rather than \u201cfixing\u201d differences.'},
+tbi:{n:'Traumatic brain injury',grp:'Injury & sleep',regions:['pfc','temp','hip','cc'],networks:[],systems:[],quiz:'pfc',refs:['maas2017'],
+ para:'Brain injury from external force: contusions typically occur at frontal and temporal poles, where tissue grinds against ridged skull bone, plus diffuse axonal injury when shearing stretches white matter — which is why attention, memory, processing speed and emotional control are so often affected even when scans look normal. Outcomes are extremely variable; repeat injuries compound damage, and rehabilitation works by retraining and re-routing function. Prevention — helmets, falls, road safety — does more than any acute drug.'},
+cte:{n:'Chronic traumatic encephalopathy (CTE)',grp:'Injury & sleep',regions:['pfc','temp','cin'],networks:[],systems:[],quiz:'pfc',refs:['mez2017'],
+ para:'A degenerative brain disease associated with repeated head impacts (contact sports, military blast), diagnosed with certainty only after death. Characteristic tau accumulates at the depths of cortical sulci, around small vessels, and in medial temporal areas; affected individuals can show mood and behavioural change, then dementia. Because most people exposed to repeated head impacts never develop CTE, and living \u201cdiagnoses\u201d are speculative, the science is still settling (Mez et al., 2017).'},
+insomnia:{n:'Insomnia',grp:'Injury & sleep',regions:['hyp','bs','thal','pfc'],networks:[],systems:['GABA'],quiz:'hyp',refs:['riemann2010','saper2005'],
+ para:'Difficulty falling or staying asleep despite adequate opportunity. The dominant model is hyperarousal: the sleep and wake systems fail to hand over cleanly at night. Key players are the hypothalamic sleep switch and the arousal systems of the brainstem and hypothalamus, with cortex showing faster activity even in deep sleep. Caffeine, stress and irregular schedules feed the loop. Cognitive behavioural therapy for insomnia (CBT-I) is the first-line treatment; sleeping pills suit limited courses under guidance.'},
+narcolepsy:{n:'Narcolepsy',grp:'Injury & sleep',regions:['hyp','bs','thal'],networks:[],systems:[],quiz:'hyp',refs:['scammell2015'],
+ para:'A sleep-wake disorder caused by the loss of a small population of orexin (hypocretin) neurons in the hypothalamus — a striking example of a few thousand cells holding sleep and wakefulness apart. Without orexin\u2019s stabilising signal the borders collapse: overwhelming daytime sleepiness, sudden muscle weakness with emotion (cataplexy), sleep paralysis and vivid dream intrusions at sleep onset. Stimulants and sodium oxybate manage symptoms; the deficit itself is permanent (Scammell, 2015).'},
+sud:{n:'Substance use disorder',grp:'Addiction',regions:['vta','nac','bg','pfc','amy','ins'],networks:[],systems:['dopamine','endorphins','GABA','serotonin','glutamate'],quiz:'nac',refs:['volkow2016','koob2016'],
+ para:'Diagnosed when use continues despite major harm, with craving, escalating tolerance and withdrawal. The dominant model (Volkow, Koob & McLellan, 2016) describes sensitised reward and salience circuits — the ventral tegmental area to nucleus accumbens dopamine pathway — plus weakened prefrontal control and disrupted stress and habit systems. Drugs of abuse converge on this circuitry even via different receptors, which is why addiction looks similar across substances. It is a treatable medical condition; stigma does more harm than the brain changes themselves.'}
+};
+
+/* ---------- 5. SUBSTANCES & MEDICATIONS ----------
+   grp: 'rec' (recreational) | 'med' (medication)
+   systems: neurotransmitter vocabulary; the four drawn pathways are
+   'dopamine','serotonin','noradrenaline','acetylcholine'. quizSys: primary drawn
+   system used by the Systems quiz (null when not one of the four). */
+const SUB={
+alcohol:{n:'Alcohol',cls:'Depressant',grp:'rec',systems:['GABA','glutamate','dopamine','endorphins'],regions:['pfc','cb','hip','bs','thal','nac'],quizSys:null,life:['teen','midlife'],refs:['koob2016','nutt2007'],
+ para:'Alcohol enhances inhibitory GABA-A receptors and suppresses excitatory NMDA-type glutamate receptors, slowing networks broadly. The cerebellum\u2019s finely tuned timing degrades first (clumsiness, slurred speech), the prefrontal cortex\u2019s inhibition next (disinhibition, risk-taking), and the hippocampus\u2019s record-keeping fails at higher doses (blackouts).',
+ acute:'Relaxation and lowered inhibition; poorer balance, reaction time and judgement; memory blackouts at higher doses.',
+ long:'Heavy use over years is associated with shrinking of frontal and temporal tissue, cerebellar damage, upregulated glutamate (driving withdrawal risk including seizures) and reward circuits retuned toward alcohol. In pregnancy it can cause fetal alcohol spectrum disorder. Detox from dependence can be dangerous — seek medical support.'},
+caffeine:{n:'Caffeine',cls:'Stimulant (adenosine antagonist)',grp:'rec',systems:['adenosine','dopamine','noradrenaline'],regions:['bs','pfc','thal'],quizSys:null,refs:['fredholm1999'],
+ para:'Caffeine blocks adenosine receptors. Adenosine normally accumulates through waking hours, dampening neural activity and building sleep pressure; blocking it removes the brake. This indirectly lifts dopamine and noradrenaline signalling — one reason caffeine pairs so well with focused work. Tolerance develops within days as receptors upregulate.',
+ acute:'Alertness, faster reaction time, improved vigilance; jitteriness and anxiety at higher doses.',
+ long:'Dependence is real but mild: withdrawal headaches and fatigue last a few days. Late-day use delays sleep by cutting adenosine pressure — a common and underestimated sleep thief (Fredholm et al., 1999).'},
+nicotine:{n:'Nicotine',cls:'Stimulant (nicotinic agonist)',grp:'rec',systems:['acetylcholine','dopamine','noradrenaline'],regions:['vta','nac','pfc','lc','amy'],quizSys:'dopamine',refs:['benowitz2010'],
+ para:'Nicotine mimics acetylcholine at nicotinic receptors, including directly on neurons of the ventral tegmental area, releasing dopamine in the nucleus accumbens. Each cigarette delivers the reinforcement signal within seconds, and receptors desensitise between puffs and doses — a fast up-and-down cycle that strengthens habit loops through the basal ganglia (Benowitz, 2010).',
+ acute:'Alertness combined with calm; reduced appetite; elevated heart rate.',
+ long:'The nicotine itself drives strong dependence, but the smoke causes most harm: cancer, heart and lung disease. Dependence keeps people smoking; the most successful quits combine behavioural support with nicotine replacement or prescribed medication.'},
+cannabis:{n:'Cannabis (THC)',cls:'Cannabinoid',grp:'rec',systems:['endocannabinoid','dopamine'],regions:['hip','cb','bg','pfc','amy','nac','thal'],quizSys:'dopamine',life:['teen'],refs:['volkow2014'],
+ para:'THC mimics the brain\u2019s own endocannabinoids, which normally act as \u201cbrakes on the brakes\u201d — retrograde signals that quieten synaptic release. The result is broad, uneven dampening: hippocampal encoding falters (short-term memory gaps), the cerebellum\u2019s timing drifts, and dopamine signalling in reward circuits rises modestly. Cannabidiol (CBD) acts differently and is not intoxicating (Volkow et al., 2014).',
+ acute:'Relaxation, altered time perception, increased appetite; impaired memory, coordination and driving; anxiety or paranoia at high doses.',
+ long:'Regular heavy use, especially of high-THC products from adolescence, is linked to worse memory and attention outcomes and higher risk of cannabis-induced psychosis in vulnerable people. Around 1 in 10 users develops dependence.'},
+cocaine:{n:'Cocaine',cls:'Stimulant (reuptake blocker)',grp:'rec',systems:['dopamine','noradrenaline','serotonin'],regions:['vta','nac','bg','pfc','lc'],quizSys:'dopamine',refs:['koob2016'],
+ para:'Cocaine blocks the dopamine transporter, so dopamine lingers in the synapse — a flood where the reward system expects a trickle. The same effect on noradrenaline and serotonin transporters sharpens arousal and mood. Because the signal is large, fast and tied to context, the nucleus accumbens learns \u201cmore of this cue, this place, this action\u201d with unusual force (Koob & Volkow, 2016).',
+ acute:'Intense euphoria, confidence, energy and talkativeness; raised heart rate and blood pressure; paranoia and aggression at high doses.',
+ long:'Tolerance to euphoria outpaces tolerance to cardiovascular strain; withdrawal brings crashing fatigue and loss of pleasure. Long use is associated with prefrontal thinning and attention deficits; crack and injection carry the steepest dependence risk. Overdose can cause fatal heart-rhythm failure.'},
+amphetamine:{n:'Amphetamine and methamphetamine',cls:'Stimulant (releaser)',grp:'rec',systems:['dopamine','noradrenaline','serotonin'],regions:['vta','nac','bg','pfc','lc'],quizSys:'dopamine',refs:['koob2016'],
+ para:'Amphetamine (including methamphetamine) is the mirror image of cocaine: instead of blocking transporters it reverses them, pushing dopamine and noradrenaline out of the cell. Effects last far longer than cocaine\u2019s, and methamphetamine is more potent and better at entering neurons. Therapeutic doses for ADHD act on the same circuits but rise slowly, which is why they aid focus rather than producing euphoria.',
+ acute:'Wakefulness, energy, appetite loss, confidence; sleeplessness, teeth-grinding and anxiety at recreational doses.',
+ long:'Heavy use — especially of methamphetamine — damages dopamine terminals and is associated with psychosis risk, dental disease and weight loss. Dependence liability is high. Recovery of dopamine function is partial but real over years of abstinence.'},
+mdma:{n:'MDMA (ecstasy)',cls:'Entactogen (serotonin releaser)',grp:'rec',systems:['serotonin','dopamine','noradrenaline'],regions:['raphe','nac','pfc','amy','hyp'],quizSys:'serotonin',refs:['nutt2007'],
+ para:'MDMA reverses the serotonin transporter most strongly, dumping serotonin from raphe-derived terminals, with smaller dopamine and noradrenaline surges. It also prompts oxytocin release, plausibly linking the drug\u2019s signature emotional openness to social-bonding circuitry. The cost arrives on the comedown: depleted serotonin drives days of low mood.',
+ acute:'Euphoria, empathy, sociability, sensory pleasure; jaw clenching, sweating, raised heart rate; dangerous overheating in hot, crowded settings.',
+ long:'Repeated heavy use is associated with memory and impulse-control changes. Purity is notoriously unreliable — substitutions such as PMA cause poisonings. Under research protocols, MDMA-assisted therapy for PTSD has shown promising early results, which are very different conditions from recreational use.'},
+opioids:{n:'Opioids (heroin, oxycodone, fentanyl)',cls:'Opioid (receptor agonist)',grp:'rec',systems:['endorphins','dopamine'],regions:['bs','nac','vta','pfc','thal','hyp'],quizSys:'dopamine',refs:['darcq2018'],
+ para:'Heroin, oxycodone, fentanyl and morphine all mimic endorphins at \u03bc-opioid receptors. Analgesia arises at spinal and midbrain sites; reward arises because opioid neurons in the ventral tegmental area disinhibit dopamine cells; and the brainstem\u2019s respiratory centre — dense with opioid receptors — slows breathing, the cause of overdose death (Darcq & Kieffer, 2018).',
+ acute:'Pain relief, warmth, calm and euphoria; pinpoint pupils, constipation, slowed breathing. The overdose triad: unconsciousness, tiny pupils, respiratory depression.',
+ long:'Tolerance builds fast — including to the respiratory effect, which is then partially lost during withdrawal, a key overdose trap. Dependence produces severe flu-like withdrawal; fentanyl\u2019s potency makes accidental overdose common. Naloxone reverses overdose; opioid substitution medication halves mortality.'},
+lsdps:{n:'LSD and psilocybin',cls:'Classical psychedelic (5-HT2A agonist)',grp:'rec',systems:['serotonin','glutamate'],regions:['pfc','occ','par','cin','temp'],quizSys:'serotonin',refs:['carhart2019'],
+ para:'Both act at serotonin 5-HT2A receptors, concentrated on deep-layer cortical pyramidal neurons. The drug loosens the brain\u2019s usual top-down models — sensory networks run more freely, and the default mode network\u2019s self-narrative relaxes, which researchers link to ego-dissolution experiences (Carhart-Harris & Friston, 2019). Effects differ sharply between people and settings (\u201cset and setting\u201d).',
+ acute:'Perceptual changes — geometric patterns, intensified colour and meaning; emotional amplification; lasting 6\u201312 hours (psilocybin shorter). Unpleasant \u201cbad trips\u201d occur.',
+ long:'Classical psychedelics are not addictive and do not drive compulsive use; the main risks are psychological destabilisation in vulnerable people and dangerous behaviour while intoxicated. Screened, supervised psilocybin therapy is being trialled for depression, with emerging evidence.'},
+ketamine:{n:'Ketamine',cls:'Dissociative anaesthetic (NMDA antagonist)',grp:'rec',systems:['glutamate','dopamine'],regions:['thal','pfc','hip','nac'],quizSys:null,refs:['zanos2018'],
+ para:'Ketamine blocks NMDA-type glutamate receptors, producing anaesthesia and a characteristic sense of detachment. At sub-anaesthetic doses it rapidly triggers a cascade — AMPA signalling, BDNF release and synapse growth — that can relieve severe depression within hours, an unusual profile that reshaped antidepressant research (Zanos & Gould, 2018).',
+ acute:'Dissociation, floating sensations, analgesia, unsteadiness; confusion and raised blood pressure; bladder damage with chronic heavy use.',
+ long:'Dependence occurs, particularly with repeated self-medication, alongside memory and bladder problems with heavy use. Esketamine is licensed for treatment-resistant depression under clinical monitoring.'},
+ssri:{n:'Antidepressants (SSRIs, SNRIs)',cls:'Medication — antidepressant',grp:'med',systems:['serotonin','noradrenaline'],regions:['raphe','pfc','cin','amy','hip'],quizSys:'serotonin',refs:['harmer2017'],
+ para:'SSRIs block the serotonin transporter; SNRIs also block the noradrenaline transporter. The transporter effect appears within hours, yet clinical improvement takes weeks — the best current account is that the brain adapts: receptors desensitise and neuroplastic changes gradually restore flexibility to mood and threat circuits (Harmer et al., 2017). They act on the same serotonin pathways drawn in the Pathways overlay.',
+ acute:'The early weeks can bring nausea, headaches, jaw clenching and increased anxiety before benefit appears.',
+ long:'For moderate-to-severe depression and anxiety disorders they help many people substantially; sexual side effects and emotional blunting are common. Stopping abruptly causes discontinuation symptoms — taper gradually with a clinician, and report worsening mood in the first weeks.'},
+antipsych:{n:'Antipsychotics',cls:'Medication — antipsychotic',grp:'med',systems:['dopamine','serotonin'],regions:['bg','vta','thal','pfc','raphe'],quizSys:'dopamine',refs:['miyamoto2012'],
+ para:'All antipsychotics block dopamine D2 receptors — more strongly in the striatum for older \u201ctypical\u201d drugs, with added serotonin 5-HT2A effects for \u201catypicals\u201d. Calming mesolimbic overactivity reduces positive symptoms such as hallucinations and delusions. But the same blockade hits the nigrostriatal pathway drawn in the overlay, which is why movement effects can appear.',
+ acute:'Sedation and inner restlessness are common early; stiffness or tremor signals strong D2 blockade.',
+ long:'Atypical drugs carry metabolic risks (weight gain — diabetes screening is needed). Tardive dyskinesia, involuntary movements, can emerge after years and warrants monitoring. Never stop abruptly without a clinician; relapse risk rises sharply.'},
+moodstab:{n:'Mood stabilisers (lithium, valproate)',cls:'Medication — mood stabiliser',grp:'med',systems:['GABA','glutamate'],regions:['pfc','amy','hip','thal'],quizSys:null,refs:['malhi2013'],
+ para:'Lithium\u2019s mechanism is famously plural: it interferes with inositol signalling, inhibits the enzyme GSK-3 (a clock-gene regulator tied to circadian instability), and supports neurotrophic and neuroprotective pathways. Valproate acts more conventionally — enhancing GABA and modulating sodium channels. Both damp the extreme swings of bipolar disorder, and lithium uniquely reduces suicide risk (Malhi et al., 2013).',
+ acute:'Lithium often needs weeks to take effect; tremor, thirst and nausea are common early.',
+ long:'Lithium has a narrow therapeutic window: blood monitoring is essential, and thyroid and kidneys need regular checks. Never adjust doses independently; stopping abruptly raises relapse risk sharply.'},
+benzo:{n:'Benzodiazepines',cls:'Medication — sedative (GABA-A modulator)',grp:'med',systems:['GABA'],regions:['amy','pfc','thal','cb','bs'],quizSys:null,refs:['griffin2013'],
+ para:'Benzodiazepines are positive allosteric modulators of GABA-A receptors: they do not open the chloride channel themselves, they make GABA\u2019s own opening more effective. Calming the amygdala and cortical arousal circuitry relieves anxiety quickly — a pharmacological contrast with antidepressants, which work slowly through adaptation (Griffin et al., 2013).',
+ acute:'Anxiety relief, muscle relaxation, sleepiness, impaired memory for recent events. Combining them with alcohol or opioids dangerously suppresses breathing.',
+ long:'Dependence develops within weeks for many people, and withdrawal can include rebound anxiety and seizures — taper slowly with medical support. Guidelines recommend short courses; they are not designed for long-term daily anxiety management.'},
+adhdmeds:{n:'ADHD medications (methylphenidate, atomoxetine)',cls:'Medication — stimulant and non-stimulant',grp:'med',systems:['dopamine','noradrenaline'],regions:['pfc','bg','cin','nac','lc'],quizSys:'dopamine',refs:['volkow2001','faraone2015'],
+ para:'Methylphenidate blocks dopamine and noradrenaline transporters — the same target as cocaine, but oral dosing raises striatal dopamine slowly, over an hour or two, which is why it improves focus without the reinforcing surge that drives misuse (Volkow et al., 2001). Atomoxetine acts only on the noradrenaline transporter, building effect over weeks. Both strengthen signalling in prefrontal working-memory and basal ganglia inhibition circuits.',
+ acute:'Improved attention and impulse control within days (stimulants); mild appetite loss and sleep delay are the commonest side effects.',
+ long:'Long-term stimulant treatment in young people shows small average effects on growth, which clinicians monitor. Taking medication does not \u201ccause\u201d later substance misuse — studies find the opposite on average. Doses should be reviewed regularly with a clinician.'}
+};
+/* ---------- 4b. LIFE STAGES & MYTHS ----------
+   LIFE: how the brain builds, remodels and ages across the lifespan.
+   regions: structure ids highlighted on the model. c/d: condition and
+   substance cross-links. MYTHS: popular claims with the evidence.
+   Educational summaries of group-level research; not clinical guidance. */
+const LIFE={
+prenatal:{n:'Before birth',era:'Conception to birth',regions:['pfc','cc','cb'],c:[],d:['alcohol'],refs:[],
+ para:'The brain is assembled in a fixed sequence: a neural tube forms within the first month, then neurons are born at an astonishing rate — up to hundreds of thousands per minute — and migrate into layered cortex before extending axons and synapses. This building phase is unusually vulnerable. Alcohol can interfere with migration and wiring, causing fetal alcohol spectrum disorder; nutrition, infections and stress hormones also leave marks. Most of the structural groundwork exists before birth, which is why the newborn brain already controls breathing, sucking and startle — and why it arrives expecting years of refinement to come.'},
+early:{n:'Early childhood',era:'Birth to about 5 years',regions:['temp','occ','pfc'],c:['epilepsy'],d:[],refs:[],
+ para:'Early childhood is the great synapse-building burst: young children form new connections at roughly double the adult rate, then keep the ones that experience uses. Sensitive periods make language, face-processing and vision unusually easy to learn now — and unusually costly to disrupt. Sleep is long for a reason: much of the day\u2019s encoding is consolidated overnight. The prefrontal systems for impulse control and planning are among the last to mature, which is why toddlers are explorers first and self-regulators considerably later.'},
+middle:{n:'Middle childhood',era:'About 6 to 11 years',regions:['par','temp','pfc'],c:['adhd','epilepsy'],d:[],refs:['faraone2015'],
+ para:'Middle childhood is a period of quiet refinement: synapse production settles, myelin insulation thickens, and the brain becomes steadily more efficient at what it already does. School skills assemble from scattered pieces — reading recruits left temporal and frontal language zones, and arithmetic builds on parietal number sense. Executive functions such as holding rules in mind and resisting impulses take clear steps forward. This is also the window in which developmental differences like ADHD are usually first noticed — recognition, of course, is not the same as explanation.'},
+teen:{n:'Adolescence',era:'About 12 to 19 years',regions:['pfc','nac','amy','vta'],c:['schizophrenia','depression','anxiety'],d:['cannabis','nicotine','alcohol'],refs:['casey2008'],
+ para:'Adolescence remodels the brain more than any stage after infancy. Synapses are pruned by the million, and myelination sweeps from back to front — leaving prefrontal control regions finishing last (Casey et al., 2008). Meanwhile reward and emotion circuits in the striatum and amygdala already run at full power, so the accelerator arrives before the brakes: heightened sensation-seeking, especially with peers around. It is also the peak onset window for anxiety, depression and psychosis, with high-THC cannabis a measurable risk factor in vulnerable people. And the body clock shifts later — teenagers are not lazy; school start times are misaligned.'},
+adult:{n:'Twenties and thirties',era:'About 20 to 39 years',regions:['pfc','vta','nac'],c:['schizophrenia','bipolar'],d:['cocaine','mdma','amphetamine'],refs:[],
+ para:'Through the twenties, prefrontal myelination and pruning finish their long tail — gradually, and with wide individual variation rather than a cliff at any magic birthday. These are also the peak years for first episodes of psychosis and bipolar disorder, and for substance-use problems: all of them feed on the same reward circuitry that makes this decade feel intense. Plasticity remains high, so languages, trades, instruments and careers are written into the brain now — and the habits built here, from sleep to drinking patterns, quietly set up the decades that follow.'},
+midlife:{n:'Forties to sixties',era:'About 40 to 64 years',regions:['pfc','hip','temp'],c:['stroke','alzheimers','tbi'],d:['alcohol'],refs:['livingston2020'],
+ para:'Processing speed eases down a few percent while vocabulary, judgement and stored knowledge keep growing — the classic trade between fluid and crystallised ability. Midlife is also when the brain\u2019s later story gets written: blood pressure, blood sugar, hearing and head injuries are among the modifiable factors that shape dementia odds decades later (Livingston et al., 2020). Mental health generally stabilises through these decades, though the consequences of untreated hypertension and heavy drinking start to surface. What protects the ageing brain begins here, not at seventy.'},
+older:{n:'Later life',era:'About 65 years onward',regions:['hip','temp','par','pfc'],c:['alzheimers','parkinsons','stroke'],d:['alcohol'],refs:['livingston2020','long2019'],
+ para:'Ageing brains shrink slightly, accumulate amyloid plaques and tau tangles in most people, and slow in fluid processing — yet they keep adapting, compensating with new connections and drawing on deep knowledge. Dementia risk rises steeply with age, but it is not destiny: the Lancet Commission estimates around 40% of dementias could be prevented or delayed by addressing twelve modifiable factors, including hearing loss, hypertension, smoking, inactivity, social isolation, excess alcohol, head injury and air pollution (Livingston et al., 2020). Movement, hearing aids, education and social contact are genuinely brain-protective — still, even, in one\u2019s eighties.'}
+};
+
+/* Popular claims, checked. claim: the myth as commonly stated; short:
+   one-line verdict used by the true-or-false quiz; real: the evidence;
+   why: why it spreads. */
+const MYTHS={
+tenpct:{n:'\u201cYou only use 10% of your brain\u201d',claim:'We only use 10% of our brain.',
+ short:'Imaging shows activity across virtually the whole brain, and damage anywhere has consequences.',
+ real:'Imaging finds activity across virtually all regions over the course of a day, and even sleep keeps most of the brain busy with consolidation work (Raichle, 2015). Damage almost anywhere — even a small stroke — produces real consequences, which is hard to square with 90% idling. The brain also runs on roughly 20% of the body\u2019s energy while being about 2% of its weight: an odd budget for a part-time organ.',
+ why:'The number seems to trace back to early neuroscience\u2019s unknowns and was kept alive by self-help marketing — an untapped reserve is a more persuasive story than a busy brain.',
+ regions:['pfc','occ','thal'],refs:['raichle2015']},
+hemi:{n:'\u201cLeft-brained and right-brained people\u201d',claim:'People are either logical left-brained or creative right-brained.',
+ short:'Real hemispheric specialisation exists, but healthy brains constantly integrate both sides — no personality split.',
+ real:'Some functions do lean to one side — language production is usually left-lateralised, attention and face processing lean right — but these are modest biases in a system that integrates across the midline constantly (Gazzaniga, 2005). No study finds personality types that follow hemispheric dominance. The split-brain patients show what happens when the connection is genuinely cut — and even they live ordinary lives.',
+ why:'A real finding (lateralisation) was stretched into a personality quiz — tidy categories spread faster than graded continua.',
+ regions:['cc','pfc','temp'],refs:['gazzaniga2005']},
+mature25:{n:'\u201cThe brain is fully developed at 25\u201d',claim:'The brain is finished developing at age 25.',
+ short:'Maturation continues through the twenties with wide individual variation — no cliff at any exact age.',
+ real:'Prefrontal myelination and synaptic pruning do continue through the twenties, but development is a gradual curve that varies by region and by person, not a switch that flips on a birthday (Casey et al., 2008). Adults of every age keep changing with experience. The tidy number is a pop-science rounding of group averages — sometimes used to dismiss the judgement of people in their early twenties, which the evidence does not support.',
+ why:'A single memorable number beats a curve with error bars — and \u201cyour brain isn\u2019t finished yet\u201d is handy in arguments.',
+ regions:['pfc'],refs:['casey2008']},
+dopa:{n:'\u201cDopamine is the pleasure chemical\u201d',claim:'Dopamine causes pleasure, so a \u201cdopamine detox\u201d resets your brain.',
+ short:'Dopamine tracks predicted reward and drives motivation and learning — you cannot detox a transmitter your brain needs.',
+ real:'Dopamine neurons fire for predicted reward and, crucially, for reward prediction error — they teach which cues and actions are worth pursuing (Schultz et al., 1997), while \u201cliking\u201d involves broader systems. People who lose dopamine cells, as in Parkinson\u2019s disease, do not lose the capacity for pleasure so much as the ability to initiate movement and effort. And you cannot \u201cdetox\u201d a transmitter your own brain requires: the trendy fasts change your habits, not your dopamine.',
+ why:'A one-word chemical story is easy to sell — and stepping away from your phone genuinely changes behaviour, which makes the false mechanism feel true.',
+ regions:['vta','nac','sn'],refs:['schultz1997']},
+braingames:{n:'\u201cBrain-training games make you smarter\u201d',claim:'Brain-training apps raise your general intelligence.',
+ short:'Practice improves the trained task and close variants; far transfer to general thinking is weak in trials.',
+ real:'People reliably get better at what they practise, including near-identical tasks. The problem is far transfer: large reviews find little evidence that hours of training lift general reasoning, school performance or daily functioning (Simons et al., 2016). The interventions with stronger evidence are unglamorous — aerobic exercise, sleep, education and genuinely new skills, which recruit wide networks rather than one trained routine.',
+ why:'Getting better at the game itself feels like getting smarter — and the apps have every incentive not to correct you.',
+ regions:['pfc','par'],refs:['simons2016']},
+boozekill:{n:'\u201cEvery drink kills brain cells\u201d',claim:'Alcohol instantly kills neurons, so each binge permanently deletes brain cells.',
+ short:'Acute alcohol disrupts signalling rather than wiping out neurons; chronic heavy use genuinely harms the brain.',
+ real:'Acute alcohol mainly changes signalling — boosting inhibitory GABA and dampening excitatory glutamate — rather than mass-killing neurons; a blackout is a hippocampal encoding failure, not a hole in the tissue. But the myth accidentally understates the real harm: years of heavy drinking shrink frontal and temporal tissue, damage the cerebellum, retune reward circuits and can produce a dangerous withdrawal syndrome (Koob & Volkow, 2016). The odd night is less catastrophic than advertised; the chronic pattern is worse than the myth suggests.',
+ why:'Vivid images are memorable — and the true chronic story is slower and less dramatic, so the slogan fills the gap.',
+ regions:['hip','cb','pfc'],refs:['koob2016']},
+chemimb:{n:'\u201cDepression is just a chemical imbalance\u201d',claim:'Depression is simply a lack of serotonin — a chemical imbalance.',
+ short:'Antidepressants change serotonin within hours but take weeks to help; depression involves networks, stress and circumstance.',
+ real:'The monoamine hypothesis shaped a generation of antidepressants, but the timeline betrays it: transporter blockade changes serotonin within hours, while clinical improvement takes weeks of brain adaptation (Harmer et al., 2017). Research now implicates interacting networks — prefrontal control, anterior cingulate monitoring, amygdala reactivity and the hippocampal effects of chronic stress — alongside inflammation, psychology and life circumstances. None of this makes depression unreal or medication useless; it makes a one-chemical story inadequate.',
+ why:'The slogan fits on a poster, and it was repeated for decades — including by professionals.',
+ regions:['pfc','cin','amy','raphe'],refs:['harmer2017']},
+styles:{n:'\u201cTeach to my learning style\u201d',claim:'Matching teaching to someone\u2019s visual, auditory or kinaesthetic \u201clearning style\u201d improves learning.',
+ short:'Preferences are real, but matching instruction to them gains nothing; everyone benefits from active, spaced, multimodal practice.',
+ real:'People do have preferences about how material is presented, and questionnaires reliably sort them. What fails is the payoff: controlled studies find that matching instruction to a measured style does not improve outcomes (Pashler et al., 2008). What helps nearly everyone is active retrieval, spacing practice over time, and using multiple modalities — for everybody, not per style.',
+ why:'The idea flatters individuality and hands out a fixed label — and everyone does have a preference to report.',
+ regions:['hip','pfc'],refs:['pashler2008']}
+};
+
+/* True statements for the true-or-false quiz round (mixed with the myths). */
+const TF=[
+{t:'Even during sleep the brain remains highly active, cycling through stages that help consolidate memories.',x:'Sleep is busy: activity alternates between deep slow-wave and REM stages, and each supports different kinds of memory consolidation.'},
+{t:'The brain is roughly 2% of body weight but uses around 20% of the body\u2019s energy.',x:'A fact that makes the \u201c10% use\u201d claim untenable — an idle 90% would be an evolutionary extravagance.'},
+{t:'The two hemispheres cooperate on almost everything through the corpus callosum\u2019s connections.',x:'Real specialisation exists — language leans left, attention right — but healthy brains integrate the two sides constantly.'},
+{t:'Adult brains keep forming new connections when people learn skills — a capacity called neuroplasticity.',x:'Change continues across life, from learning a language to recovering after stroke: slower with age, but real.'}
+];
+/* ---------- 6. CASE STUDIES ---------- */
+const CASES={
+hm:{n:'H.M. — the man who couldn\u2019t form new memories',era:'1953 onwards',structures:['hip','amy','temp'],refs:['scoville1957'],
+ story:'To treat severe epilepsy, surgeons removed most of Henry Molaison\u2019s medial temporal lobes on both sides, including the hippocampi. His epilepsy improved, but he could no longer form new conscious memories — and yet he learned motor skills day by day while insisting he had never practised. Brenda Milner\u2019s studies revealed multiple memory systems: the hippocampus for new conscious (declarative) memory, other systems for skills and priming (Scoville & Milner, 1957).',
+ lesson:'Memory is not a single store. Structures deep in the temporal lobe file new experiences, while skills are written elsewhere — a discovery that founded modern memory neuroscience.',
+ caveat:'H.M. was one person with unusual surgical lesions; modern imaging shows memory depends on wider medial temporal networks.'},
+gage:{n:'Phineas Gage — personality after frontal injury',era:'1848',structures:['pfc'],refs:['damasio1994'],
+ story:'An iron rod shot through Gage\u2019s left frontal lobe in a blasting accident. He survived, could walk and speak, but friends reportedly said \u201cGage was no longer Gage\u201d: his employers found him changed where he had been capable and polite. Damasio and colleagues later reconstructed his skull injury to show damage to both medial frontal regions (Damasio et al., 1994).',
+ lesson:'Prefrontal circuits carry the machinery of planning, social judgement and self-regulation — not just abstract reasoning, but choosing.',
+ caveat:'Popular retellings exaggerate: Gage recovered substantially, worked in Chile for years, and the case is less clean than the legend.'},
+tan:{n:'\u2018Tan\u2019 (Louis Leborgne) — the case behind Broca\u2019s area',era:'1861',structures:['pfc'],refs:['dronkers2007'],
+ story:'Leborgne could understand speech and produce only the syllable \u201ctan\u201d. After his death, Paul Broca examined the brain and found damage in the left inferior frontal gyrus — evidence that a specific language function lived in a specific place. Later imaging of both of Broca\u2019s patients showed damage extending beyond the classic \u201cBroca\u2019s area\u201d (Dronkers et al., 2007).',
+ lesson:'Language production depends on left inferior frontal circuits — one of neuroscience\u2019s earliest structure-function mappings.',
+ caveat:'Leborgne had more widespread damage than the textbook \u201cBroca\u2019s area\u201d, so the tidy version of the story is partly retrospective.'},
+sm:{n:'S.M. — fearless without an amygdala',era:'1994 onwards',structures:['amy'],refs:['adolphs1994'],
+ story:'S.M. has a rare genetic condition (Urbach-Wiethe disease) that calcified both amygdalae. She recognises nearly every facial expression except fear, and in decades of studies — including genuinely threatening situations — showed strikingly little learned fear, while still reporting internal panic.',
+ lesson:'The amygdala is central to detecting and learning external threats — though fear is a whole-network experience, not a single organ\u2019s output.',
+ caveat:'A single rare case; later patients with similar damage show partial patterns, so the mapping is not absolute.'},
+wj:{n:'The split-brain patients — two hemispheres, one mind?',era:'1960s onwards',structures:['cc'],refs:['gazzaniga2005'],
+ story:'For severe epilepsy, a small number of patients had the corpus callosum cut, isolating the hemispheres. In tests, objects shown only to the right hemisphere could be picked with the left hand but not named; each hemisphere could act — and seem to know — independently (Gazzaniga, 2005).',
+ lesson:'The corpus callosum integrates information across hemispheres; competence and awareness are distributed, not seated in one spot.',
+ caveat:'Patients lived normal lives outside the lab; everyday behaviour does not split the way experimental conditions reveal.'}
+};
+
+/* ---------- 7. GLOSSARY ---------- */
+const GLOSS={
+agonist:'A molecule that activates a receptor, like a key fitting a lock — mimicking the brain\u2019s own transmitter.',
+antagonist:'A molecule that blocks a receptor without activating it, stopping the brain\u2019s own transmitter from binding there.',
+'allosteric modulator':'A molecule that binds a site next to a receptor\u2019s main dock and changes how strongly the main transmitter works — positive modulators amplify it, negative ones dampen it. Benzodiazepines are positive modulators of GABA-A receptors.',
+amyloid:'A protein fragment that clumps into plaques in Alzheimer\u2019s disease; the amyloid cascade is one leading (still debated) account of how the disease begins.',
+axon:'The long output fibre of a neuron, carrying electrical spikes toward the next cell. White matter is mostly bundled axons.',
+'blood-brain barrier':'Tight sealing of brain blood vessels that keeps most large molecules — and most drugs — out of the brain. Drugs must be specifically shaped to cross it.',
+cortex:'The folded grey-matter sheet on the brain\u2019s surface, ~2\u20134 mm thick, where most conscious perception, language and planning is computed.',
+'default mode network':'A set of regions most active at rest, during mind-wandering and self-related thought; it typically quiets during focused tasks (Raichle, 2015).',
+dependence:'An adaptive state where stopping a substance causes withdrawal symptoms — physical or psychological. Dependence is not the same as addiction, though they often co-occur.',
+dopamine:'A neurotransmitter central to reward learning, motivation and movement. Often mislabelled \u201cthe pleasure chemical\u201d — it signals predicted value and error more than pleasure itself.',
+dissociative:'A drug class (e.g. ketamine) that produces detachment from sensation, self or surroundings, mainly by blocking NMDA-type glutamate receptors.',
+endocannabinoid:'The brain\u2019s own cannabis-like signalling molecules (anandamide, 2-AG), which act as retrograde messengers that quieten synaptic release.',
+excitatory:'Making the receiving neuron more likely to fire. The main excitatory transmitter is glutamate.',
+fMRI:'Functional magnetic resonance imaging — indirectly measures brain activity via blood-oxygen changes, a second or slower signal than the neural activity itself.',
+'functional connectivity':'Statistical synchrony between activity in different regions over time; the basis for defining resting-state networks.',
+GABA:'Gamma-aminobutyric acid — the brain\u2019s main inhibitory transmitter, opening chloride channels that make neurons less likely to fire.',
+glutamate:'The brain\u2019s main excitatory transmitter, essential for learning; excessive glutamate can be toxic to neurons.',
+'grey matter':'Neuronal cell bodies and synapses — the computing tissue of cortex and deep nuclei.',
+gyrus:'A ridge of folded cortex (plural: gyri). Folding packs more sheet into the skull.',
+inhibitory:'Making the receiving neuron less likely to fire. The main inhibitory transmitter is GABA.',
+interoception:'Sensing the internal state of the body — heartbeat, breath, temperature — largely routed through the insula.',
+lesion:'A localised area of damage or tissue loss. Lesion studies compare deficits across injuries to infer function.',
+myelin:'Fatty insulation wrapped around axons by oligodendrocytes, speeding electrical conduction. Its loss in multiple sclerosis slows or blocks signals.',
+neurodegenerative:'Involving progressive loss of neurons — as in Alzheimer\u2019s, Parkinson\u2019s and Huntington\u2019s disease.',
+neuroplasticity:'The brain\u2019s capacity to change its connections with experience, learning and — to a degree — after injury or drug exposure.',
+neuromodulator:'A transmitter that adjusts the properties of whole networks rather than passing a fast on/off signal — dopamine, serotonin and noradrenaline all act this way.',
+neurotransmitter:'A chemical messenger released at synapses to pass signals between neurons.',
+noradrenaline:'A neuromodulator (also called norepinephrine) central to arousal, vigilance and the gain of cortical processing, released mainly by the locus coeruleus.',
+psychedelic:'A drug class (LSD, psilocybin) acting mainly at serotonin 5-HT2A receptors, producing profound changes in perception, mood and sense of self.',
+receptor:'A protein that recognises a specific transmitter or drug and converts binding into a cellular effect.',
+reuptake:'The re-absorption of transmitter by the releasing neuron — the recycling step blocked (or reversed) by many antidepressants and stimulants.',
+seizure:'A wave of hypersynchronous electrical discharge in brain networks, producing temporary changes in movement, sensation, awareness or behaviour.',
+serotonin:'A neuromodulator with 14+ receptor types, involved in mood, sleep, appetite and impulse control — usually via the raphe nuclei\u2019s widespread projections.',
+sulcus:'A groove between cortical ridges (plural: sulci). Landmark sulci, like the central sulcus, divide lobes.',
+synapse:'The tiny junction where one neuron passes signal to another, across a gap of ~20\u201340 nanometres.',
+tolerance:'A state where repeated use produces weaker effects, so more of the drug is needed for the same result.',
+'white matter':'Bundles of myelinated axons connecting regions — the brain\u2019s wiring.',
+withdrawal:'The cluster of symptoms that appears when a dependent person stops or reduces a substance; often the opposite of the drug\u2019s acute effects.'
+};
+
+/* ---------- 8. GUIDED TOUR ---------- */
+const TOUR=[
+{t:'Welcome',x:'This is a schematic brain you can rotate, slice and light up. Drag the brain to spin it, pinch or scroll to zoom, or use the arrow keys. Everything shown is simplified — a teaching aid, not anatomy or medical advice.',
+ go:()=>{S.mode='region';S.sel=null;S.op=1;S.ax='none';S.cut=1;S.both=true;S.paths='off';S.lab=false;S.cnd=null;S.sub=null;S.caseI=null;S.life=null;S.myth=null;S.q='';try{$('q').value=''}catch(e){};camTo(1.5708,1.5708,3.4);apply();view();}},
+{t:'Regions',x:'This is the prefrontal cortex. The buttons below the brain select the same structures as tapping the model itself. Each region\u2019s panel cross-links to the conditions and substances that involve it — follow those links to move between layers.',
+ go:()=>{S.mode='region';S.sel='pfc';S.lab=true;camTo(1.5708,1.5708,3.0);view();}},
+{t:'Functions and networks',x:'Real functions recruit many regions — \u201cone region, one job\u201d doesn\u2019t hold. Networks, estimated from resting-state imaging, are a complementary view: large sets of regions that tend to co-activate.',
+ go:()=>{S.mode='function';S.fn='Executive control';S.lab=true;view();}},
+{t:'Going deeper',x:'Internal view lowers the cortex\u2019s opacity so deep structures appear — here the basal ganglia, habit and action-selection machinery. The slice controls cut the brain side-to-side, front-to-back or top-to-bottom.',
+ go:()=>{S.mode='region';S.sel='bg';S.op=.25;S.lab=true;S.ax='none';$('op').value=25;$('int').classList.add('on');apply();camTo(1.5708,1.5708,2.6);view();}},
+{t:'Conditions',x:'Each condition highlights the regions and networks most consistently implicated. Here is Parkinson\u2019s disease, where dopamine neurons of the substantia nigra (the small orange structure inside the brainstem) degenerate. These are average findings from research — not diagnoses.',
+ go:()=>{S.mode='conditions';S.cnd='parkinsons';S.sel=null;S.op=.25;S.lab=true;$('op').value=25;$('int').classList.add('on');apply();camTo(1.5708,1.5708,2.9);view();}},
+{t:'Substances and medications',x:'Every entry names the neurotransmitter systems it acts on. With Pathways on, the major projection routes are drawn on the model — dopamine (red), serotonin (blue), noradrenaline (amber), acetylcholine (green). Here: SSRIs, which raise serotonin signalling via the raphe nuclei\u2019s projections.',
+ go:()=>{S.mode='substances';S.sub='ssri';S.paths='all';S.op=.3;$('op').value=30;$('int').classList.add('on');apply();camTo(1.5708,1.5708,3.0);view();}},
+{t:'Compare and quiz',x:'Compare two structures side by side, or test yourself — the quiz covers structures, conditions, neurotransmitter systems and a true-or-false round on popular claims.',
+ go:()=>{S.mode='compare';S.cmp=['pfc','par'];S.op=1;S.lab=false;$('op').value=100;$('int').classList.remove('on');apply();view();}},
+{t:'Across life — and the myths',x:'The brain remodels itself from before birth into old age: a synapse burst in childhood, pruning in adolescence, plasticity that never fully stops. Alongside it sits a myth-busting lens — claims like “we only use 10% of our brain” checked against the evidence — and a printable summary of whatever you are looking at.',
+ go:()=>{S.mode='life';S.life='teen';S.sel=null;S.op=1;S.lab=false;$('op').value=100;$('int').classList.remove('on');S.paths='off';apply();camTo(1.5708,1.5708,3.4);view();}},
+{t:'Your notes and the small print',x:'Notes and bookmarks are saved in your browser only. The glossary explains technical terms; the References panel lists the science behind each claim. And anything you\u2019re unsure about — medication changes, substance concerns — belongs with a qualified clinician, not an app.',
+ go:()=>{S.mode='region';S.sel=null;S.paths='off';S.tourOn=false;S.life=null;S.myth=null;apply();view();}}
+];
+/* ---------- state & helpers ---------- */
 const $=id=>document.getElementById(id);
-$('refs').innerHTML=['Corbetta, M., & Shulman, G. L. (2002). Control of goal-directed and stimulus-driven attention in the brain. <i>Nature Reviews Neuroscience, 3</i>(3), 201–215. https://doi.org/10.1038/nrn755','Diamond, A. (2013). Executive functions. <i>Annual Review of Psychology, 64</i>, 135–168. https://doi.org/10.1146/annurev-psych-113011-143750','Pessoa, L. (2008). On the relationship between emotion and cognition. <i>Nature Reviews Neuroscience, 9</i>(2), 148–158. https://doi.org/10.1038/nrn2317','Poldrack, R. A. (2006). Can cognitive processes be inferred from neuroimaging data? <i>Trends in Cognitive Sciences, 10</i>(2), 59–63. https://doi.org/10.1016/j.tics.2005.12.004','Raichle, M. E. (2015). The brain\'s default mode network. <i>Annual Review of Neuroscience, 38</i>, 433–447. https://doi.org/10.1146/annurev-neuro-071013-014030','Schmahmann, J. D., & Sherman, J. C. (1998). The cerebellar cognitive affective syndrome. <i>Brain, 121</i>(4), 561–579. https://doi.org/10.1093/brain/121.4.561','Scoville, W. B., & Milner, B. (1957). Loss of recent memory after bilateral hippocampal lesions. <i>Journal of Neurology, Neurosurgery & Psychiatry, 20</i>(1), 11–21. https://doi.org/10.1136/jnnp.20.1.11','Seeley, W. W., Menon, V., Schatzberg, A. F., Keller, J., Glover, G. H., Kenna, H., Reiss, A. L., & Greicius, M. D. (2007). Dissociable intrinsic connectivity networks for salience processing and executive control. <i>Journal of Neuroscience, 27</i>(9), 2349–2356. https://doi.org/10.1523/JNEUROSCI.5587-06.2007','Yeo, B. T. T., Krienen, F. M., Sepulcre, J., Sabuncu, M. R., Lashkari, D., Hollinshead, M., Roffman, J. L., Smoller, J. W., Zöllei, L., Polimeni, J. R., Fischl, B., Liu, H., & Buckner, R. L. (2011). The organization of the human cerebral cortex estimated by intrinsic functional connectivity. <i>Journal of Neurophysiology, 106</i>(3), 1125–1165. https://doi.org/10.1152/jn.00338.2011'].map(t=>`<p>${t}</p>`).join('');
-const D={
-hip:{n:'Hippocampus',h:50,fn:['Forming new episodic memories','Spatial memory and navigation','Linking events to their context','Memory consolidation'],ef:'Not an executive region, but it supplies episodic and contextual information that prefrontal control selects and uses during retrieval.',les:'Bilateral medial temporal damage causes profound loss of new memories, as in patient H.M. (Scoville & Milner, 1957).'},
-amy:{n:'Amygdala',h:0,fn:['Detecting emotionally significant stimuli','Emotional learning, including fear conditioning','Modulating memory for emotional events','Processing social and facial emotion cues'],ef:'Interacts with prefrontal regions in emotion regulation. Emotion and cognition are better seen as integrated than separate (Pessoa, 2008).',les:'Bilateral damage has been linked to impaired recognition of fear in faces (Adolphs et al., 1994); effects vary with lesion extent.'},
-thal:{n:'Thalamus',h:120,fn:['Relaying sensory signals to cortex (except smell)','Gating attention and arousal','Relaying motor loops via basal ganglia and cerebellum','Looping with prefrontal cortex in higher-order functions'],ef:'Higher-order nuclei form loops with prefrontal cortex and contribute to attention and working memory. Evidence is less direct than for cortex.',les:'Thalamic stroke can cause sensory loss, altered consciousness, and memory or executive problems, depending on the nuclei affected.'},
-bg:{n:'Basal ganglia',h:245,fn:['Selecting and initiating actions','Habit and procedural learning','Reward-based learning (dopamine)','Cognitive and motivational loops with prefrontal cortex'],ef:'Parallel loops link basal ganglia with prefrontal cortex (Alexander et al., 1986) and are thought to support selecting actions and cognitive content.',les:'Parkinson\'s disease involves loss of dopamine inputs, causing slowed movement, tremor and rigidity. Huntington\'s disease affects caudate and putamen.'},
-ins:{n:'Insula',h:70,fn:['Interoception (sensing internal bodily state)','Awareness of feelings and bodily states','Salience detection (anterior insula)','Taste and pain processing'],ef:'Anterior insula is a core salience-network node that helps switch between large-scale networks (Seeley et al., 2007; Craig, 2009).',les:'Damage can alter pain, taste and awareness of bodily and emotional states. Lesions rarely respect its boundaries, so effects vary.'},
-cin:{n:'Cingulate cortex',h:310,fn:['Monitoring conflict and errors','Linking pain and negative affect with control','Motivation and effort (anterior)','Self-referential processing and memory (posterior)'],ef:'Anterior cingulate is implicated in cognitive control and monitoring (Shackman et al., 2011). Posterior cingulate is a default mode hub.',les:'Large anterior cingulate lesions are linked to reduced spontaneous behaviour (akinetic mutism), though such cases are rare.'},
-cc:{n:'Corpus callosum',h:175,fn:['Connecting the two hemispheres','Integrating information across the midline','Coordinating bilateral movement and attention'],ef:'White matter, not a processing region. It supports interhemispheric integration when tasks recruit both prefrontal cortices.',les:'Surgical severing (split-brain procedure) disconnects the hemispheres in certain tasks (Gazzaniga, 2005).'},
-hyp:{n:'Hypothalamus',h:25,fn:['Homeostasis: temperature, hunger, thirst','Controlling the pituitary and stress hormones','Sleep-wake and circadian regulation','Motivated behaviours such as feeding'],ef:'Not an executive region. It sets internal states (hunger, stress) that influence cognitive control indirectly.',les:'Damage can disrupt appetite, temperature control, sleep and hormonal regulation (Saper & Lowell, 2014).'}};
-Object.assign(R,D);
-FN['Memory'].push('hip');FN['Executive control'].push('cin','bg');FN['Movement'].push('bg','thal');FN['Vision'].push('thal');FN['Hearing'].push('thal');FN['Touch and body sense'].push('thal','ins');FN['Arousal and alertness'].push('thal','hyp');FN['Emotion and motivation']=['amy','hyp','ins','cin','pfc'];
-NET['Ventral attention / salience'].push('ins','cin');NET['Default mode'].push('cin');
-$('refs').innerHTML+=['Adolphs, R., Tranel, D., Damasio, H., & Damasio, A. (1994). Impaired recognition of emotion in facial expressions following bilateral damage to the human amygdala. <i>Nature, 372</i>(6507), 669–672. https://doi.org/10.1038/372669a0','Alexander, G. E., DeLong, M. R., & Strick, P. L. (1986). Parallel organization of functionally segregated circuits linking basal ganglia and cortex. <i>Annual Review of Neuroscience, 9</i>, 357–381. https://doi.org/10.1146/annurev.ne.09.030186.002041','Craig, A. D. (2009). How do you feel — now? The anterior insula and human awareness. <i>Nature Reviews Neuroscience, 10</i>(1), 59–70. https://doi.org/10.1038/nrn2555','Gazzaniga, M. S. (2005). Forty-five years of split-brain research and still going strong. <i>Nature Reviews Neuroscience, 6</i>(8), 653–659. https://doi.org/10.1038/nrn1723','Poldrack, R. A., Baker, C. I., Durnez, J., Gorgolewski, K. J., Matthews, P. M., Munafò, M. R., Nichols, T. E., Poline, J.-B., Vul, E., & Yarkoni, T. (2017). Scanning the horizon: Towards transparent and reproducible neuroimaging research. <i>Nature Reviews Neuroscience, 18</i>(2), 115–126. https://doi.org/10.1038/nrn.2016.167','Saper, C. B., & Lowell, B. B. (2014). The hypothalamus. <i>Current Biology, 24</i>(23), R1111–R1116. https://doi.org/10.1016/j.cub.2014.10.023','Shackman, A. J., Salomons, T. V., Slagter, H. A., Fox, A. S., Winter, J. J., & Davidson, R. J. (2011). The integration of negative affect, pain and cognitive control in the cingulate cortex. <i>Nature Reviews Neuroscience, 12</i>(3), 154–167. https://doi.org/10.1038/nrn2994'].map(t=>`<p>${t}</p>`).join('');
-const ids=Object.keys(R),opt=(o,v)=>Object.keys(o).map(k=>`<option ${k===v?'selected':''}>${k}</option>`).join('');
+const ids=Object.keys(R);
+const opt=(o,v)=>Object.keys(o).map(k=>`<option ${k===v?'selected':''}>${k}</option>`).join('');
 const ls={g:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 let bm=[];try{bm=JSON.parse(ls.g('bxb')||'[]')}catch(e){}
-let S={mode:'region',sel:null,fn:Object.keys(FN)[0],net:Object.keys(NET)[0],q:'',cmp:[],qz:null,sc:[0,0],bm,op:1,ax:'none',cut:1,both:true};
-/* 3D scene */
+let S={mode:'region',sel:null,fn:Object.keys(FN)[0],net:Object.keys(NET)[0],cnd:null,sub:null,caseI:null,life:null,myth:null,cq:'all',sq:'all',q:'',cmp:[],qz:null,qzc:'struct',sc:[0,0],bm,op:1,ax:'none',cut:1,both:true,lab:false,paths:'off',pathSolo:null,tourOn:false,tourI:0};
+/* ---------- 9. 3D SCENE ---------- */
 const cv=$('cv'),rd=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});rd.localClippingEnabled=true;rd.setPixelRatio(Math.min(devicePixelRatio||1,2));
 const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(35,1,.1,50),pl=new THREE.Plane(new THREE.Vector3(-1,0,0),9);
-sc.add(new THREE.AmbientLight(0xffffff,.8));[[3,3,3,.55],[-3,-1,-3,.35]].forEach(a=>{const d=new THREE.DirectionalLight(0xffffff,a[3]);d.position.set(a[0],a[1],a[2]);sc.add(d)});
+sc.add(new THREE.AmbientLight(0xffffff,.85));[[3,3,3,.5],[-3,-1,-3,.3],[0,-2,3,.18]].forEach(a=>{const d=new THREE.DirectionalLight(0xffffff,a[3]);d.position.set(a[0],a[1],a[2]);sc.add(d)});
 const sm=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t)};
-const rgOf=p=>{const q=p.z+.3*(p.y-.2);return p.y<-.1-.18*(p.z-.4)&&p.z<.45&&p.z>-.6?'temp':q>.4?'pfc':q>.22?'motor':q>.05?'sens':q>-.5?'par':'occ'};
-const g=new THREE.SphereGeometry(1,128,96),pa=g.attributes.position,vr=[],gv=[];
+/* Anatomical landmark lines (schematic, in mesh coordinates) */
+const ySyl=z=>z>=.55?-.02:-.02-.27*(z-.55);          /* Sylvian fissure: rises toward the back */
+const zCs=y=>y>=.58?.02:y<=.10?.42:.02+.40*(.58-y)/.48; /* central sulcus: runs down-forward */
+const CORTEX=['pfc','motor','sens','par','temp','occ'];
+const rgOf=p=>{const y=p.y-.04,z=p.z,x=p.x,fy=ySyl(z),cz=zCs(y);
+ if(y<-.18&&x<.5)return z>.1?'pfc':z<-.45?'occ':'temp'; /* flat underside: orbital / ventral */
+ if(y<fy-.02&&z>-.55&&z<.72&&y>-.62)return 'temp';
+ if(z<-.55)return 'occ';
+ if(y>.10&&Math.abs(z-cz)<.10)return z>cz?'motor':'sens';
+ if(z>cz+.10)return 'pfc';
+ if(y<=.10&&z>.38)return 'pfc';
+ return 'par'};
+/* Cortex: sphere with procedural gyri/sulci, Sylvian + central grooves, shaped lobes */
+const g=new THREE.SphereGeometry(1,150,110),pa=g.attributes.position,vr=[],gv=[];
 for(let i=0;i<pa.count;i++){const sx=pa.getX(i),sy=pa.getY(i),sz=pa.getZ(i),
- n=(Math.sin(20*sz+3*Math.sin(9*sy)+2*sx)+Math.sin(17*sy+4*Math.sin(7*sz)+3*sx)+Math.sin(15*sx+14*sz+2*Math.sin(6*sy)))/3,gr=Math.pow(1-Math.abs(n),4),d=1-.035*gr,
- t=sm(-.7,-.3,sz)*sm(.65,.25,sz);
- let x=.38+.5*sx*(1-.18*sm(.45,1,sz)-.22*sm(-.4,-1,sz)),y=.08+.58*sy*(sy<0?.55+.45*t:1),z=sz;
- x-=.09*sm(0,.8,sx)*Math.exp(-((sz-.4)*(sz-.4)/.012+(sy+.12)*(sy+.12)/.03));
- x=Math.max(.38+(x-.38)*d,0);y=.08+(y-.08)*d;z*=d;
- const p=new THREE.Vector3(x,y,z);pa.setXYZ(i,x,y,z);vr.push(rgOf(p));gv.push(x<.003?0:gr)}
+ f=.6*Math.sin(14*sz+4*Math.sin(6*sy+2*sx)+2*Math.sin(11*sx))+.4*Math.sin(12*sy+3*Math.sin(7*sz-4*sx)+1.5*Math.sin(9*sx+3*sz)),
+ ridge=1-Math.pow(Math.abs(f),.55),fd=Math.pow(1-ridge,1.3),d1=1-.062*fd,
+ mic=1-.016*Math.pow(Math.abs(Math.sin(22*sx+18*sy+8*Math.sin(9*sz))),.8),
+ t=sm(-.78,-.38,sz)*sm(.65,.25,sz);
+ let x=.38+.5*sx*(1-.18*sm(.45,1,sz)-.22*sm(-.4,-1,sz)),y=.08+.58*sy*(sy<0?.58+.42*t:1),z=sz;
+ x-=.09*sm(0,.8,sx)*Math.exp(-((sz-.4)*(sz-.4)/.012+(sy+.12)*(sy+.12)/.03)); /* frontal eye-field notch */
+ x+=.05*Math.exp(-((z-.45)*(z-.45)/.022+(y+.12)*(y+.12)/.04));              /* temporal pole bulge */
+ y+=.10*sm(.50,.28,x)*sm(-.05,-.35,y);                                      /* flat medial base */
+ x=Math.max(x,0);
+ const y2=y-.04,df=Math.abs(y2-ySyl(z)),lat=sm(.45,.62,x),
+ gSyl=sm(.13,.02,df)*lat*(z>-.62&&z<.6?1:0),
+ cz=zCs(y2),gCs=sm(.08,.02,Math.abs(z-cz))*lat*(y2>.08&&y2<.6?1:0),
+ dd=d1*mic*(1-.075*gSyl)*(1-.05*gCs);
+ x=.38+(x-.38)*dd;y=.08+(y-.08)*dd;z=z*dd;
+ const p=new THREE.Vector3(x,y,z);pa.setXYZ(i,x,y,z);vr.push(rgOf(p));gv.push(fd)}
 g.computeVertexNormals();g.setAttribute('color',new THREE.BufferAttribute(new Float32Array(pa.count*3),3));
 const cm=new THREE.MeshLambertMaterial({vertexColors:true,clippingPlanes:[pl]}),cx=new THREE.Mesh(g,cm),cxb=new THREE.Mesh(g,new THREE.MeshBasicMaterial({side:THREE.BackSide,clippingPlanes:[pl]}));cx.userData.r='cortex';cxb.userData.back=1;
-const mk=(k,geo,x,y,z,s)=>{const m=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({transparent:true}));m.userData.r=k;m.position.set(x,y,z);if(s)m.scale.set(s[0],s[1],s[2]);return m};
-const cbg=new THREE.SphereGeometry(1,48,32);{const a=cbg.attributes.position;for(let i=0;i<a.count;i++){const x=a.getX(i),y=a.getY(i),z=a.getZ(i),f=1+.05*Math.sin(34*y);a.setXYZ(i,x*f,y*(y<0?.8:1),z*f)}cbg.computeVertexNormals()}
-const sp=new THREE.SphereGeometry(1,24,16),tb=(pts,r)=>new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(a=>new THREE.Vector3(a[0],a[1],a[2]))),32,r,8);
-const Lg=new THREE.Group();Lg.add(cx,cxb,mk('cb',cbg,.24,-.5,-.62,[.25,.16,.26]),mk('thal',sp,.1,.06,-.08,[.09,.08,.12]),mk('bg',sp,.22,.13,.16,[.1,.1,.16]),mk('amy',sp,.27,-.22,.14,[.06,.06,.06]),mk('ins',sp,.31,-.02,.12,[.04,.12,.24]),mk('hyp',sp,0,-.12,.06,[.04,.04,.05]),
- mk('hip',tb([[.17,.02,-.4],[.24,-.1,-.3],[.3,-.2,-.05],[.28,-.2,.08]],.04),0,0,0),mk('cin',tb([[.04,.15,.5],[.04,.42,.3],[.04,.46,-.1],[.04,.28,-.5]],.035),0,0,0),mk('cc',tb([[0,.1,.4],[0,.22,.25],[0,.25,-.1],[0,.14,-.45]],.03),0,0,0));
+/* helper constructors */
+const mk=(k,geo,x,y,z,s,rx,rz)=>{const m=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({transparent:true}));m.userData.r=k;m.position.set(x,y,z);if(s)m.scale.set(s[0],s[1],s[2]);if(rx)m.rotation.x=rx;if(rz)m.rotation.z=rz;return m};
+const tb=(pts,r,taper)=>{const c=new THREE.CatmullRomCurve3(pts.map(a=>new THREE.Vector3(a[0],a[1],a[2]))),tub=36,rad=10,geo=new THREE.TubeGeometry(c,tub,r,rad,false);
+ if(taper){const p2=geo.attributes.position,cen=new THREE.Vector3();
+  for(let i=0;i<=tub;i++){const u=i/tub;cen.copy(c.getPointAt(u));const f=taper(u);
+   for(let j=0;j<=rad;j++){const idx=i*(rad+1)+j,px=p2.getX(idx),py=p2.getY(idx),pz=p2.getZ(idx);p2.setXYZ(idx,cen.x+(px-cen.x)*f,cen.y+(py-cen.y)*f,cen.z+(pz-cen.z)*f)}}
+  geo.computeVertexNormals()}
+ return{g:geo,c}};
+const sp=new THREE.SphereGeometry(1,28,20);
+/* deep structures with shaped geometry */
+const cbg=new THREE.SphereGeometry(1,64,48);{const a=cbg.attributes.position;for(let i=0;i<a.count;i++){const x=a.getX(i),y=a.getY(i),z=a.getZ(i),
+ f=(1+.05*Math.sin(y*38))*(1+.06*Math.exp(-Math.pow((x+.8)/.3,2)))*(1-.10*sm(.3,.7,z));
+ a.setXYZ(i,x*f*.30,y*f*.15,z*f*.27)}cbg.computeVertexNormals()}
+const hiptb=tb([[.30,-.06,.34],[.36,-.12,.16],[.35,-.19,-.04],[.29,-.22,-.24],[.24,-.20,-.34]],.034,u=>(1+.6*Math.exp(-Math.pow(u/.18,2)))*(1-.4*sm(.5,1,u)));
+const cadtb=tb([[.26,.16,.28],[.30,.10,.08],[.28,.02,-.10],[.22,-.02,-.24]],.033,u=>1-.45*u);
+const Lg=new THREE.Group();
+Lg.add(cx,cxb,
+ mk('cb',cbg,.36,-.34,-.46),
+ mk('thal',sp,.13,.05,-.02,[.11,.09,.14]),
+ mk('bg',cadtb.g,0,0,0),
+ mk('bg',sp,.27,.04,.10,[.045,.08,.13],-.35,.15),
+ mk('amy',sp,.30,-.13,.20,[.048,.062,.05],-.2,-.25),
+ mk('ins',sp,.35,.03,.08,[.028,.06,.13]),
+ mk('hyp',sp,.04,-.10,.03,[.035,.032,.045]),
+ mk('hip',hiptb.g,0,0,0),
+ mk('cin',tb([[.03,.14,.46],[.04,.30,.34],[.05,.34,.02],[.04,.28,-.30],[.03,.12,-.46]],.032).g,0,0,0,[1,.75,1]),
+ mk('cc',tb([[0,.07,.42],[0,.19,.30],[0,.23,0],[0,.16,-.32],[0,.06,-.42]],.026).g,0,0,0),
+ mk('vta',sp,.035,-.20,-.05,[.038,.032,.038]),
+ mk('sn',sp,.07,-.19,-.06,[.05,.028,.045]),
+ mk('nac',sp,.20,-.12,.26,[.05,.042,.05]),
+ mk('lc',sp,.06,-.30,-.14,[.03,.026,.03]),
+ mk('raphe',tb([[0,-.26,-.12],[0,-.34,-.10],[0,-.42,-.08]],.016).g,0,0,0));
 const Rg=Lg.clone();Rg.scale.x=-1;Rg.visible=false;
-const bs=mk('bs',new THREE.CylinderGeometry(.09,.07,.6,16),0,-.52,-.18);bs.rotation.x=-.3;sc.add(Lg,Rg,bs);
+const bsPts=[[.055,-.54],[.07,-.44],[.085,-.36],[.115,-.26],[.10,-.16],[.08,-.08],[.068,0]].map(p=>new THREE.Vector2(p[0],p[1]));
+const bs=mk('bs',new THREE.LatheGeometry(bsPts,24),0,-.10,-.10);bs.rotation.x=-.10;sc.add(Lg,Rg,bs);
 const meshes=[];[Lg,Rg].forEach(G=>G.children.forEach(o=>o.userData.back||meshes.push(o)));meshes.push(bs);const backs=[];[Lg,Rg].forEach(G=>G.children.forEach(o=>o.userData.back&&backs.push(o)));
-/* camera */
+/* ---------- neurotransmitter pathway overlay ---------- */
+const SYS={dopamine:{c:'#D8433B',label:'Dopamine'},serotonin:{c:'#3D7DD8',label:'Serotonin'},noradrenaline:{c:'#E89B2C',label:'Noradrenaline'},acetylcholine:{c:'#3FA65C',label:'Acetylcholine'}};
+const PATHS=[
+ {sys:'dopamine',id:'da-nigrostriatal',pts:[[.08,-.2,-.06],[.14,-.1,-.02],[.22,0,.04],[.27,.03,.09]]},
+ {sys:'dopamine',id:'da-mesolimbic',pts:[[.05,-.21,-.05],[.1,-.17,.08],[.16,-.13,.2],[.2,-.12,.26]]},
+ {sys:'dopamine',id:'da-mesocortical',pts:[[.05,-.21,-.05],[.16,-.02,.15],[.3,.2,.4],[.42,.34,.58]]},
+ {sys:'serotonin',id:'5ht-frontal',pts:[[0,-.3,-.1],[.12,-.1,.1],[.28,.1,.35],[.4,.3,.55]]},
+ {sys:'serotonin',id:'5ht-posterior',pts:[[0,-.3,-.1],[.14,-.05,-.05],[.3,.1,-.3],[.42,.25,-.6]]},
+ {sys:'serotonin',id:'5ht-parietal',pts:[[0,-.3,-.1],[.12,0,.05],[.3,.28,.05],[.44,.42,0]]},
+ {sys:'noradrenaline',id:'ne-frontal',pts:[[.05,-.3,-.14],[.14,-.12,0],[.28,.08,.3],[.4,.3,.5]]},
+ {sys:'noradrenaline',id:'ne-parietal',pts:[[.05,-.3,-.14],[.15,-.08,-.05],[.32,.2,-.15],[.44,.45,-.2]]},
+ {sys:'acetylcholine',id:'ach-frontal',pts:[[.18,-.1,.12],[.24,-.08,.3],[.3,-.02,.45]]},
+ {sys:'acetylcholine',id:'ach-temporal',pts:[[.18,-.1,.12],[.24,-.12,-.05],[.3,-.15,-.25]]}];
+const pathMats={},pulses=[],Pg=new THREE.Group();
+PATHS.forEach((p,i)=>{const m=new THREE.MeshBasicMaterial({color:SYS[p.sys].c,transparent:true,opacity:.85,depthWrite:false});m.userData.sys=p.sys;pathMats[p.sys]=m;
+ const c=new THREE.CatmullRomCurve3(p.pts.map(a=>new THREE.Vector3(a[0],a[1],a[2]))),tube=new THREE.Mesh(new THREE.TubeGeometry(c,32,.011,8,false),m);
+ tube.renderOrder=3;tube.userData.path=1;Pg.add(tube);
+ const pu=new THREE.Mesh(new THREE.SphereGeometry(.016,10,8),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.9}));
+ pu.renderOrder=4;pu.userData={pulse:1,c,ph:i*.37};Pg.add(pu);pulses.push(pu)});
+{const nb=new THREE.Mesh(new THREE.SphereGeometry(.02,10,8),new THREE.MeshBasicMaterial({color:SYS.acetylcholine.c,transparent:true,opacity:.9}));nb.position.set(.18,-.1,.12);nb.renderOrder=4;Pg.add(nb)}
+sc.add(Pg);Pg.visible=false;
+/* ---------- floating labels ---------- */
+const ANCH={};{const cnt={},sum={};
+ for(let i=0;i<vr.length;i++){const k=vr[i];if(pa.getX(i)<.42)continue;cnt[k]=(cnt[k]||0)+1;(sum[k]=sum[k]||new THREE.Vector3()).add(new THREE.Vector3(pa.getX(i),pa.getY(i),pa.getZ(i)))}
+ Object.keys(sum).forEach(k=>ANCH[k]=sum[k].multiplyScalar(1/cnt[k]))}
+Object.assign(ANCH,{cb:new THREE.Vector3(.48,-.34,-.48),bs:new THREE.Vector3(.08,-.40,-.05),thal:new THREE.Vector3(.15,.06,-.02),bg:new THREE.Vector3(.28,.10,.06),hip:new THREE.Vector3(.34,-.16,-.04),amy:new THREE.Vector3(.31,-.13,.21),ins:new THREE.Vector3(.36,.03,.08),cin:new THREE.Vector3(.06,.34,0),cc:new THREE.Vector3(.02,.24,-.02),hyp:new THREE.Vector3(.05,-.10,.03),vta:new THREE.Vector3(.04,-.20,-.05),sn:new THREE.Vector3(.08,-.19,-.06),nac:new THREE.Vector3(.21,-.12,.26),lc:new THREE.Vector3(.06,-.30,-.14),raphe:new THREE.Vector3(.02,-.34,-.09)});
+const labelBox=$('labels'),LBL=ids.map(k=>{const el=document.createElement('div');el.className='blabel'+(CORTEX.includes(k)?'':' deep');el.style.display='none';
+ el.innerHTML='<i style="background:hsl('+R[k].h+' 62% 45%)"></i>'+R[k].n;labelBox.appendChild(el);
+ return{k,el,a:ANCH[k],deep:!CORTEX.includes(k)}});
+const V=new THREE.Vector3();
+function updLabels(){const litset=lit(),w=cv.clientWidth,h=cv.clientHeight,showDeep=S.op<1||S.ax!=='none';
+ LBL.forEach(o=>{const on=(S.lab&&litset.includes(o.k))||o.k===S.sel;
+  if(!on||(o.deep&&!showDeep&&o.k!==S.sel)){o.el.style.display='none';return}
+  V.copy(o.a).project(cam);if(V.z>1||V.x<-1.05||V.x>1.05||V.y<-1.05||V.y>1.05){o.el.style.display='none';return}
+  o.el.style.display='flex';
+  o.el.classList.toggle('strong',o.k===S.sel);
+  o.el.style.transform='translate('+((V.x*.5+.5)*w).toFixed(1)+'px,'+((-V.y*.5+.5)*h).toFixed(1)+'px) translate(-50%,-130%)'})}
+/* ---------- camera ---------- */
 let th=Math.PI/2,ph=Math.PI/2,dist=3.4,au=false,dirty=true;const rm=matchMedia('(prefers-reduced-motion:reduce)').matches,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 function place(){const t=S.both?0:.28;cam.position.set(t+dist*Math.sin(ph)*Math.sin(th),.05+dist*Math.cos(ph),dist*Math.sin(ph)*Math.cos(th));cam.lookAt(t,.05,0)}
+function camTo(a,b,c){th=a;ph=b;dist=c;dirty=true}
 function rs(){const w=cv.clientWidth,h=cv.clientHeight;if(!w||!h)return;rd.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();dirty=true}
 new ResizeObserver(rs).observe(cv);
-(function loop(){if(au&&!rm){th+=.008;dirty=true}if(dirty){place();rd.render(sc,cam);dirty=false}requestAnimationFrame(loop)})();
+requestAnimationFrame(function loop(t){if(au&&!rm){th+=.008;dirty=true}
+ if(S.paths!=='off'&&!rm){const now=t*.00025;pulses.forEach(p=>{const u=(now+p.userData.ph)%1;p.userData.c.getPointAt(u,p.position);p.visible=true});dirty=true}
+ else pulses.forEach(p=>p.visible=false);
+ if(dirty){place();rd.render(sc,cam);updLabels();dirty=false}requestAnimationFrame(loop)});
 const P=new Map();let mv=0;
 cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);P.set(e.pointerId,[e.clientX,e.clientY]);mv=0});
 cv.addEventListener('pointermove',e=>{if(!P.has(e.pointerId))return;const o=P.get(e.pointerId),n=[e.clientX,e.clientY];
@@ -152,47 +676,244 @@ function pick(e){const r=cv.getBoundingClientRect();rc.setFromCamera({x:(e.clien
  let h=rc.intersectObjects(meshes.filter(o=>o.parent.visible)).filter(x=>x.object.userData.r!=='cortex'||pl.distanceToPoint(x.point)>=0);
  if(S.op<.5){const d=h.filter(x=>x.object.userData.r!=='cortex');if(d.length)h=d}
  if(!h.length)return;let k=h[0].object.userData.r;if(k==='cortex')k=vr[h[0].face.a];choose(k)}
-/* state and views */
-const hit=q=>{q=q.toLowerCase();return ids.filter(k=>[R[k].n,...R[k].fn,R[k].ef,R[k].les].join(' ').toLowerCase().includes(q))};
-function lit(){if(S.mode==='function')return FN[S.fn];if(S.mode==='network')return NET[S.net];if(S.mode==='compare')return S.cmp.length?S.cmp:ids;if(S.mode==='quiz')return ids;if(S.q.trim())return hit(S.q.trim());return S.sel?[S.sel]:ids}
-const newQ=()=>{const a=ids[Math.random()*ids.length|0];S.qz={a,t:R[a].fn[Math.random()*R[a].fn.length|0]}};
-function choose(k){const z=S.qz;if(S.mode==='quiz'){if(z&&!z.done){z.done=1;z.pick=k;S.sc[1]++;if(R[k].fn.includes(z.t))S.sc[0]++}}else if(S.mode==='compare')S.cmp=S.cmp.length===2?[k]:S.cmp.concat(k);else S.sel=S.sel===k&&S.mode==='region'?null:k;view()}
-const lv=()=>parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--l'))/100;
+/* ---------- painting & clipping ---------- */
 function paint(on,sl){const l=lv(),C={},gr=new THREE.Color().setHSL(0,0,Math.min(.92,l+.1));ids.forEach(k=>C[k]=new THREE.Color().setHSL(R[k].h/360,sl(k)?.75:.45,sl(k)?l-.18:l));
- const ca=g.attributes.color;for(let i=0;i<vr.length;i++){const c=on.includes(vr[i])?C[vr[i]]:gr,f=1-.32*gv[i];ca.setXYZ(i,c.r*f,c.g*f,c.b*f)}ca.needsUpdate=true;
- backs[0].material.color.set(getComputedStyle(document.documentElement).getPropertyValue('--tint').trim()||'#ccc');meshes.forEach(m=>{const k=m.userData.r;if(k==='cortex')return;const o=on.includes(k);m.material.color.copy(o?C[k]:gr);m.material.opacity=o?1:.22;m.material.depthWrite=o});dirty=true}
-function apply(){cm.opacity=S.op;cm.transparent=S.op<1;cm.depthWrite=S.op>=1;cm.needsUpdate=true;const c=S.cut,a=S.ax;pl.normal.set(a==='x'?-1:0,a==='y'?-1:0,a==='z'?-1:0);pl.constant=a==='none'?9:a==='x'?(2*c-1)*.95:a==='y'?.07+(2*c-1)*.7:(2*c-1)*1.1;Rg.visible=S.both;backs.forEach(o=>o.visible=S.op>=1);dirty=true}
-const pn=k=>{const r=R[k],ns=Object.keys(NET).filter(n=>NET[n].includes(k)),fs=Object.keys(FN).filter(n=>FN[n].includes(k));return `<h2>${r.n}</h2><h3>Often associated with</h3><ul>${r.fn.map(x=>`<li>${x}</li>`).join('')}</ul><h3>Appears in ${fs.length} of the functions here</h3><p>${fs.join(', ')||'None listed'}</p><h3>Cortical networks</h3><p>${ns.join(', ')||'Not a cortical network node (or not covered by this parcellation).'}</p><h3>Executive functioning</h3><p>${r.ef}</p><h3>Lesion examples</h3><p>${r.les}</p>`};
+ const ca=g.attributes.color;for(let i=0;i<vr.length;i++){const c=on.includes(vr[i])?C[vr[i]]:gr,f=1-.42*gv[i];ca.setXYZ(i,c.r*f,c.g*f,c.b*f)}ca.needsUpdate=true;
+ backs[0].material.color.set(getComputedStyle(document.documentElement).getPropertyValue('--tint').trim()||'#ccc');meshes.forEach(m=>{const k=m.userData.r;if(k==='cortex')return;const o=on.includes(k);m.material.color.copy(o?C[k]:gr);m.material.opacity=o?1:.22;m.material.depthWrite=o});
+ const act=activeSys();Object.keys(pathMats).forEach(sys=>{pathMats[sys].opacity=S.paths==='off'?.85:(!act||act.includes(sys)?.9:.12)});dirty=true}
+function apply(){cm.opacity=S.op;cm.transparent=S.op<1;cm.depthWrite=S.op>=1;cm.needsUpdate=true;const c=S.cut,a=S.ax;pl.normal.set(a==='x'?-1:0,a==='y'?-1:0,a==='z'?-1:0);pl.constant=a==='none'?9:a==='x'?(2*c-1)*.95:a==='y'?.07+(2*c-1)*.7:(2*c-1)*1.1;Rg.visible=S.both;backs.forEach(o=>o.visible=S.op>=1);Pg.visible=S.paths!=='off';dirty=true}
+/* ---------- 10. LENSES & STATE ---------- */
+const MODES=[['region','By region'],['function','By function'],['network','By network'],['conditions','Conditions'],['substances','Substances & meds'],['cases','Case studies'],['life','Across life'],['myths','Myths & hype'],['compare','Compare'],['quiz','Quiz']];
+const hit=q=>{q=q.toLowerCase();const m=s=>s.toLowerCase().includes(q);
+ return{r:ids.filter(k=>[R[k].n,...R[k].fn,R[k].ef,R[k].les].join(' ').toLowerCase().includes(q)),
+ f:Object.keys(FN).filter(m),n:Object.keys(NET).filter(m),
+ c:Object.keys(COND).filter(k=>m(COND[k].n)||m(COND[k].para)),
+ d:Object.keys(SUB).filter(k=>m(SUB[k].n)||m(SUB[k].cls)||m(SUB[k].para)),
+ k:Object.keys(CASES).filter(k=>m(CASES[k].n)||m(CASES[k].story)),
+ l:Object.keys(LIFE).filter(k=>m(LIFE[k].n)||m(LIFE[k].era)||m(LIFE[k].para)),
+ y:Object.keys(MYTHS).filter(k=>m(MYTHS[k].n)||m(MYTHS[k].claim)||m(MYTHS[k].real)),
+ g:Object.keys(GLOSS).filter(m)}};
+function lit(){if(S.mode==='function')return FN[S.fn];if(S.mode==='network')return NET[S.net];
+ if(S.mode==='conditions')return S.cnd?COND[S.cnd].regions:ids;
+ if(S.mode==='substances')return S.sub?SUB[S.sub].regions:ids;
+ if(S.mode==='cases')return S.caseI?CASES[S.caseI].structures:ids;
+ if(S.mode==='life')return S.life&&LIFE[S.life].regions.length?LIFE[S.life].regions:ids;
+ if(S.mode==='myths')return S.myth&&MYTHS[S.myth].regions.length?MYTHS[S.myth].regions:ids;
+ if(S.mode==='compare')return S.cmp.length?S.cmp:ids;if(S.mode==='quiz')return ids;
+ if(S.q.trim())return hit(S.q.trim()).r;return S.sel?[S.sel]:ids}
+function activeSys(){if(S.paths==='off')return null;if(S.pathSolo)return[S.pathSolo];
+ if(S.mode==='substances'&&S.sub){const a=SUB[S.sub].systems.filter(s=>SYS[s]);return a.length?a:null}return null}
+const newQ=cat=>{cat=cat||S.qzc||'struct';
+ if(cat==='cond'){const cs=Object.keys(COND),c=cs[Math.random()*cs.length|0];S.qz={cat,a:COND[c].quiz,t:COND[c].n}}
+ else if(cat==='sys'){const ss=Object.keys(SUB).filter(k=>SUB[k].quizSys),s=ss[Math.random()*ss.length|0];S.qz={cat,a:SUB[s].quizSys,t:SUB[s].n}}
+ else if(cat==='myth'){if(Math.random()<.45){const f=TF[Math.random()*TF.length|0];S.qz={cat:'myth',a:'true',t:f.t,exp:f.x}}
+  else{const ms=Object.keys(MYTHS),k=ms[Math.random()*ms.length|0];S.qz={cat:'myth',a:'false',t:MYTHS[k].claim,exp:MYTHS[k].short}}}
+ else{const a=ids[Math.random()*ids.length|0];S.qz={cat:'struct',a,t:R[a].fn[Math.random()*R[a].fn.length|0]}}};
+function choose(k){const z=S.qz;
+ if(S.mode==='quiz'){if(z&&!z.done&&(z.cat==='struct'||z.cat==='cond')){z.done=1;z.pick=k;S.sc[1]++;const ok=z.cat==='cond'?k===z.a:R[k].fn.includes(z.t);if(ok)S.sc[0]++}}
+ else if(S.mode==='compare')S.cmp=S.cmp.length===2?[k]:S.cmp.concat(k);
+ else S.sel=S.sel===k&&S.mode==='region'?null:k;view()}
+const lv=()=>parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--l'))/100;
+const refShort=k=>{const t=REFS[k]||k;const y=(t.match(/\((\d{4})\)/)||[])[1];return t.split(',')[0]+' ('+(y||'n.d.')+')'};
+const condFor=k=>Object.keys(COND).filter(c=>COND[c].regions.includes(k));
+const subFor=k=>Object.keys(SUB).filter(d=>SUB[d].regions.includes(k));
+const mini=(kind,k)=>`<button class="mini" data-go="${kind}:${k}">${{r:()=>R[k].n,c:()=>COND[k].n,d:()=>SUB[k].n,k:()=>CASES[k].n,n:()=>k+' network',f:()=>k,l:()=>LIFE[k].n,y:()=>MYTHS[k].n}[kind]()}</button>`;
+const sysChip=s=>SYS[s]?`<span class="mini"><i style="background:${SYS[s].c}"></i>${s}</span>`:`<span class="mini">${s}</span>`;
+const gbtn=t=>`<button class="gbtn" data-g="${t}">${t}</button>`;
+const srcHtml=refs=>refs&&refs.length?`<h3>Sources</h3><p class="muted">${refs.map(k=>`<button class="gbtn" data-ref="${k}">${refShort(k)}</button>`).join(' \u00b7 ')}. Open <b>References</b> below for full citations.</p>`:'';
+const linkBtn=`<p><button class="copylink" data-link="1">Copy link to this view</button></p>`;
+function pn(k){const r=R[k],ns=Object.keys(NET).filter(n=>NET[n].includes(k)),fs=Object.keys(FN).filter(n=>FN[n].includes(k)),cs=condFor(k),ds=subFor(k);
+ return `<h2>${r.n}</h2><h3>Often associated with</h3><ul>${r.fn.map(x=>`<li>${x}</li>`).join('')}</ul>`
+ +`<h3>Appears in ${fs.length} of the functions here</h3><p>${fs.join(', ')||'None listed'}</p>`
+ +`<h3>Cortical networks</h3><p>${ns.map(n=>mini('n',n)).join('')||'Not a cortical network node (or not covered by this parcellation).'}</p>`
+ +(cs.length?`<h3>Conditions linked to this structure</h3><p>${cs.map(c=>mini('c',c)).join('')}</p>`:'')
+ +(ds.length?`<h3>Substances and medications affecting it</h3><p>${ds.map(d=>mini('d',d)).join('')}</p>`:'')
+ +`<h3>Executive functioning</h3><p>${r.ef}</p><h3>Lesion examples</h3><p>${r.les}</p>`
+ +srcHtml(r.refs)+linkBtn}
+function cndP(k){const c=COND[k];
+ return `<h2>${c.n}</h2><p class="muted">${c.grp} condition</p><h3>What the research shows</h3><p>${c.para}</p>`
+ +(c.networks.length?`<h3>Networks implicated</h3><p>${c.networks.map(n=>mini('n',n)).join('')}</p>`:'')
+ +(c.systems.length?`<h3>Neurotransmitter systems</h3><p>${c.systems.map(sysChip).join('')}</p>`:'')
+ +`<h3>Structures highlighted on the model</h3><p>${c.regions.map(r=>mini('r',r)).join('')}</p>`
+ +(c.life&&c.life.length?`<h3>Life-stage context</h3><p>${c.life.map(x=>mini('l',x)).join('')}</p>`:'')
+ +(c.systems.some(s=>SYS[s])?`<p><button class="mini" data-pth="1">Show pathways on the model</button></p>`:'')
+ +`<p class="muted">These are group-level research findings, not a diagnostic tool. See References for sources.</p>`+srcHtml(c.refs)+linkBtn}
+function subP(k){const d=SUB[k];
+ return `<h2>${d.n}</h2><p class="muted">${d.cls} \u00b7 ${d.grp==='med'?'psychiatric medication':'recreational substance'}</p>`
+ +`<h3>How it works in the brain</h3><p>${d.para}</p>`
+ +`<h3>Systems involved</h3><p>${d.systems.map(sysChip).join('')}</p>`
+ +(d.systems.some(s=>SYS[s])?`<p><button class="mini" data-pth="1">Show pathways on the model</button></p>`:'')
+ +`<h3>Short-term effects</h3><p>${d.acute}</p><h3>${d.grp==='med'?'What to know if it\u2019s prescribed':'Longer-term effects and risks'}</h3><p>${d.long}</p>`
+ +`<h3>Structures highlighted on the model</h3><p>${d.regions.map(r=>mini('r',r)).join('')}</p>`
+ +(d.life&&d.life.length?`<h3>Life-stage context</h3><p>${d.life.map(x=>mini('l',x)).join('')}</p>`:'')
+ +srcHtml(d.refs)+linkBtn}
+function caseP(k){const c=CASES[k];
+ return `<h2>${c.n}</h2><p class="muted">${c.era}</p><h3>What happened</h3><p>${c.story}</p>`
+ +`<h3>What it taught neuroscience</h3><p>${c.lesson}</p>`
+ +`<h3>Handle with care</h3><p class="muted">${c.caveat}</p>`
+ +`<h3>Structures highlighted on the model</h3><p>${c.structures.map(r=>mini('r',r)).join('')}</p>`
+ +srcHtml(c.refs)+linkBtn}
+function lifeP(k){const c=LIFE[k];
+ return `<h2>${c.n}</h2><p class="muted">${c.era}</p><h3>What is happening</h3><p>${c.para}</p>`
+ +(c.c.length?`<h3>Conditions often first noticed or risk-linked here</h3><p>${c.c.map(x=>mini('c',x)).join('')}</p>`:'')
+ +(c.d.length?`<h3>Substances of particular concern in this window</h3><p>${c.d.map(x=>mini('d',x)).join('')}</p>`:'')
+ +`<h3>Structures highlighted on the model</h3><p>${c.regions.map(r=>mini('r',r)).join('')}</p>`
+ +`<p class="muted">Typical patterns from developmental research, not a timetable — individual variation is enormous.</p>`
+ +srcHtml(c.refs)+linkBtn}
+function mythP(k){const c=MYTHS[k];
+ return `<h2>${c.n}</h2><p class="muted">Popular claim, checked</p><h3>The claim</h3><p>\u201c${c.claim}\u201d</p>`
+ +`<h3>What the evidence says</h3><p>${c.real}</p><h3>Why it spreads</h3><p>${c.why}</p>`
+ +(c.regions.length?`<h3>Related on the model</h3><p>${c.regions.map(r=>mini('r',r)).join('')}</p>`:'')
+ +srcHtml(c.refs)+linkBtn}
 function view(){
- const on=lit(),hq=S.q.trim()?hit(S.q.trim()):null,z=S.qz,sl=k=>S.mode==='compare'?S.cmp.includes(k):S.mode==='quiz'?!!(z&&z.done&&k===z.a):k===S.sel;
- document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===S.mode));
- document.querySelectorAll('#chips button').forEach(b=>{const k=b.dataset.r;b.classList.toggle('on',sl(k));b.hidden=!!hq&&!hq.includes(k);b.textContent=(S.bm.includes(k)?'★ ':'')+R[k].n});
- $('pick').innerHTML=S.mode==='function'?`<label for="pk" class="muted">Choose a function</label><select id="pk" data-s="fn">${opt(FN,S.fn)}</select><br><br>`:S.mode==='network'?`<label for="pk" class="muted">Choose a network</label><select id="pk" data-s="net">${opt(NET,S.net)}</select><br><br>`:'';
- paint(on,sl);let h='';
+ const on=lit(),hq=S.q.trim()?hit(S.q.trim()):null,z=S.qz,
+ sl=k=>S.mode==='compare'?S.cmp.includes(k):S.mode==='quiz'?!!(z&&z.done&&k===z.a):k===S.sel;
+ document.querySelectorAll('#modes [data-m]').forEach(b=>b.classList.toggle('on',b.dataset.m===S.mode));
+ document.querySelectorAll('#vw [data-a]').forEach(b=>{if(b.dataset.a==='lab')b.classList.toggle('on',S.lab);if(b.dataset.a==='path')b.classList.toggle('on',S.paths!=='off')});
+ /* entity chips */
+ let ch='';
+ if(S.mode==='conditions'){ch=GRPS.map(q=>`<button class="mini ${S.cq===q?'on':''}" data-cq="${q}">${q}</button>`).join('')+Object.keys(COND).filter(k=>S.cq==='all'||COND[k].grp===S.cq).map(k=>`<button data-e="c:${k}" class="${S.cnd===k?'on':''}">${COND[k].n}</button>`).join('')}
+ else if(S.mode==='substances'){ch=[['all','All'],['rec','Recreational'],['med','Medications']].map(q=>`<button class="mini ${S.sq===q[0]?'on':''}" data-sq="${q[0]}">${q[1]}</button>`).join('')+Object.keys(SUB).filter(k=>S.sq==='all'||SUB[k].grp===S.sq).map(k=>`<button data-e="d:${k}" class="${S.sub===k?'on':''}">${SUB[k].n}</button>`).join('')}
+ else if(S.mode==='cases'){ch=Object.keys(CASES).map(k=>`<button data-e="k:${k}" class="${S.caseI===k?'on':''}">${CASES[k].n}</button>`).join('')}
+ else if(S.mode==='life'){ch=Object.keys(LIFE).map(k=>`<button data-e="l:${k}" class="${S.life===k?'on':''}">${LIFE[k].n}</button>`).join('')}
+ else if(S.mode==='myths'){ch=Object.keys(MYTHS).map(k=>`<button data-e="y:${k}" class="${S.myth===k?'on':''}">${MYTHS[k].n}</button>`).join('')}
+ else{ch=ids.map(k=>`<button data-r="${k}" class="${sl(k)?'on':''}" ${hq&&!hq.r.includes(k)?'hidden':''}>${(S.bm.includes(k)?'\u2605 ':'')+R[k].n}</button>`).join('')}
+ $('chips').innerHTML=ch;
+ /* lens selector */
+ $('pick').innerHTML=S.mode==='function'?`<label for="pk" class="muted">Choose a function</label><select id="pk" data-s="fn">${opt(FN,S.fn)}</select><br><br>`
+  :S.mode==='network'?`<label for="pk" class="muted">Choose a network</label><select id="pk" data-s="net">${opt(NET,S.net)}</select><br><br>`:'';
+ /* legend */
+ if(S.paths!=='off'){$('legend').hidden=false;
+  $('legend').innerHTML='<span class="muted" style="align-self:center">Pathways:</span>'+Object.keys(SYS).map(s=>`<button data-sys="${s}" class="${S.pathSolo&&S.pathSolo!==s?'off':''}"><i style="background:${SYS[s].c}"></i>${SYS[s].label}</button>`).join('');
+ } else {$('legend').hidden=true;$('legend').innerHTML=''}
+ paint(on,sl);
+ /* tour panel */
+ const T=$('tour');
+ if(S.tourOn&&TOUR[S.tourI]){T.hidden=false;const st=TOUR[S.tourI];
+  T.innerHTML=`<div class="panel tourp"><h2 style="margin-bottom:.2rem">${st.t}</h2><p>${st.x}</p><div class="tsteps"><span class="tprog">Step ${S.tourI+1} of ${TOUR.length}</span><button class="mini" data-t="end">End tour</button>${S.tourI>0?'<button class="mini" data-t="prev">Back</button>':''}<button class="mini on" data-t="next">${S.tourI===TOUR.length-1?'Finish':'Next'}</button></div></div>`;
+ } else T.hidden=true;
+ /* info panels */
+ let h='';
  if(S.mode==='function')h+=`<div class="panel lens"><h2>${S.fn}</h2><p>Regions commonly involved: ${FN[S.fn].map(k=>R[k].n).join(', ')}.</p><p class="muted">One function recruits several regions. Membership is simplified.</p></div>`;
  if(S.mode==='network')h+=`<div class="panel lens"><h2>${S.net} network</h2><p>${NETD[S.net]}</p><p>Regions containing nodes: ${NET[S.net].map(k=>R[k].n).join(', ')}.</p><p class="muted">Based on group-average resting-state parcellation (Yeo et al., 2011), which covers cortex only. Boundaries vary between individuals.</p></div>`;
- if(S.mode==='quiz'){if(!z)newQ();const q=S.qz;h+=`<div class="panel lens"><h2>Quiz</h2><p>Which structure is often associated with: <b>${q.t}</b>?</p><p>${q.done?(R[q.pick].fn.includes(q.t)?'Correct: ':'Not quite. Answer: ')+R[q.a].n:'Tap the brain or a button below.'}</p><p class="muted">Score ${S.sc[0]}/${S.sc[1]}. Some functions involve several structures.</p>${q.done?'<button id="nx">Next question</button>':''}</div>`}
+ if(S.mode==='conditions')h+=S.cnd?`<div class="panel lens">${cndP(S.cnd)}</div>`:`<div class="panel lens"><h2>Conditions</h2><p>Choose a condition to highlight the regions and networks most consistently implicated in research, and read how the picture goes beyond single brain areas.</p><p class="muted">Group-level findings — useful for orientation, not for diagnosing yourself or anyone else.</p></div>`;
+ if(S.mode==='substances')h+=`<div class="warn"><b>Educational orientation only — not medical advice.</b> Never start, stop or change medication without a qualified clinician. Recreational-drug summaries describe known mechanisms and population-level harms; they cannot tell you about dose, purity or your personal risk. If substance use feels hard to control, contacting local support services early genuinely helps.</div>`+(S.sub?`<div class="panel lens">${subP(S.sub)}</div>`:`<div class="panel lens"><h2>Substances & medications</h2><p>Choose an entry to see how it acts on neurotransmitter systems and which brain structures it affects — and turn on <b>Pathways</b> above the brain to draw the major projection routes.</p></div>`);
+ if(S.mode==='cases')h+=S.caseI?`<div class="panel lens">${caseP(S.caseI)}</div>`:`<div class="panel lens"><h2>Case studies</h2><p>Famous patients taught neuroscience some of its most durable lessons. Choose a case to highlight the structures involved and read what each did — and didn\u2019t — prove.</p></div>`;
+ if(S.mode==='life')h+=S.life?`<div class="panel lens">${lifeP(S.life)}</div>`:`<div class="panel lens"><h2>The brain across life</h2><p>The brain is rebuilt repeatedly from before birth into old age: neurons born and wired before birth, synapses overproduced then pruned through childhood and adolescence, myelination finishing its slow tail in adulthood, and plasticity persisting into later life. Each stage highlights what is being built, the vulnerabilities of that window, and what supports it.</p><p class="muted">Stage boundaries are approximations and individual variation is enormous.</p></div>`;
+ if(S.mode==='myths')h+=S.myth?`<div class="panel lens">${mythP(S.myth)}</div>`:`<div class="panel lens"><h2>Myths & hype</h2><p>Popular brain claims usually carry a grain of truth stretched well past the evidence. Each entry states the claim as it circulates, what the research actually shows, and why the version spreads. Rehearse the evidence, not the slogan.</p></div>`;
+ if(S.mode==='quiz'){if(!S.qz)newQ();const q=S.qz;
+  h+=`<div class="panel lens"><h2>Quiz</h2><p class="muted">Category: ${[['struct','Structures'],['cond','Conditions'],['sys','Systems'],['myth','True or false']].map(c=>`<button class="mini ${S.qzc===c[0]?'on':''}" data-qc="${c[0]}">${c[1]}</button>`).join(' ')}</p>`;
+  if(q.cat==='sys'){h+=`<p>Which major pathway does <b>${q.t}</b> act on most directly?</p>`;
+   if(!q.done)h+=`<div class="qsys">${Object.keys(SYS).map(s=>`<button class="mini" data-qa="${s}"><i style="background:${SYS[s].c}"></i>${SYS[s].label}</button>`).join('')}</div>`;
+   else h+=`<p>${q.pick===q.a?'Correct: ':`Not quite — it\u2019s `}<b>${SYS[q.a].label}</b>.</p>`}
+  else if(q.cat==='myth'){h+=`<p>True or false: <b>${q.t}</b></p>`;
+   if(!q.done)h+=`<div class="qsys"><button class="mini" data-qa="true">True</button><button class="mini" data-qa="false">False</button></div>`;
+   else h+=`<p>${q.pick===q.a?'Correct — ':'Not quite — actually '}${q.a==='false'?`it\u2019s a myth. ${q.exp}`:`this one is true. ${q.exp}`}</p>`}
+  else{h+=`<p>${q.cat==='cond'?`Which structure is most classically affected in: <b>${q.t}</b>?`:`Which structure is often associated with: <b>${q.t}</b>?`}</p><p>${q.done?(q.cat==='cond'?(q.pick===q.a?'Correct: ':'Not quite. Answer: '):(R[q.pick].fn.includes(q.t)?'Correct: ':'Not quite. Answer: '))+R[q.a].n:'Tap the brain or a button below.'}</p>`}
+  h+=`<p class="muted">Score ${S.sc[0]}/${S.sc[1]}.</p>${q.done?'<button id="nx">Next question</button>':''}</div>`}
  else if(S.mode==='compare')h+=S.cmp.length?`<div class="cols">${S.cmp.map(k=>`<div class="panel">${pn(k)}</div>`).join('')}</div>${S.cmp.length<2?'<p class="muted">Choose a second structure to compare.</p>':''}`:`<div class="panel"><h2>Compare</h2><p>Choose two structures, on the brain or with the buttons.</p></div>`;
  else if(S.sel)h+=`<div class="panel">${pn(S.sel)}<h3>Your notes</h3><textarea id="nt" rows="3" aria-label="Notes on ${R[S.sel].n}"></textarea><p><button data-bm="${S.sel}" class="${S.bm.includes(S.sel)?'on':''}">${S.bm.includes(S.sel)?'Remove bookmark':'Bookmark'}</button></p><p class="muted">Notes and bookmarks stay in this browser only.</p></div>`;
  else if(S.mode==='region')h+=`<div class="panel"><h2>Choose a structure</h2><p>Tap the brain or a button below. Drag to rotate. Use Internal view or the slice controls to see deeper structures.</p></div>`;
- h+=`<div class="panel"><h3 style="margin-top:0">Reading this critically</h3><p class="muted">Regions and functions map many-to-many (Pessoa, 2008). Activation in a region does not show which mental process occurred, because the inference is probabilistic (Poldrack, 2006). Findings are group-level and neuroimaging faces reproducibility challenges (Poldrack et al., 2017), so treat these summaries as orientation, not explanation.</p></div>`;
- $('info').innerHTML=h;const nt=$('nt');if(nt){nt.value=ls.g('bxn:'+S.sel)||'';nt.oninput=()=>ls.s('bxn:'+S.sel,nt.value)}}
-/* controls */
-$('modes').innerHTML=[['region','By region'],['function','By function'],['network','By network'],['compare','Compare'],['quiz','Quiz']].map(a=>`<button data-m="${a[0]}">${a[1]}</button>`).join('');
+ h+=`<p class="noprint"><button class="copylink" data-print="1">Print this view</button><button class="copylink" data-copy="1">Copy as text</button></p>`;
+ h+=`<div class="panel"><h3 style="margin-top:0">Reading this critically</h3><p class="muted">Regions and functions map many-to-many (Pessoa, 2008). Activation in a region does not show which mental process occurred, because the inference is probabilistic (Poldrack, 2006). Findings are group-level and neuroimaging faces reproducibility challenges (Poldrack et al., 2017). Condition\u2013region links are research associations, not diagnoses of individuals; substance and medication entries describe typical mechanisms and population-level effects, which vary widely between people — medication should never be changed without a clinician. Treat these summaries as orientation, not explanation.</p></div>`;
+ $('info').innerHTML=h;const nt=$('nt');if(nt){nt.value=ls.g('bxn:'+S.sel)||'';nt.oninput=()=>ls.s('bxn:'+S.sel,nt.value)}
+ /* results */
+ const R2=$('results');
+ if(S.q.trim()&&hq){R2.hidden=false;R2.innerHTML=resultsHtml(hq)}else R2.hidden=true;
+ writeHash();
+}
+function resultsHtml(hh){const G=[['Structures',hh.r,'r'],['Functions',hh.f,'f'],['Networks',hh.n,'n'],['Conditions',hh.c,'c'],['Substances & meds',hh.d,'d'],['Case studies',hh.k,'k'],['Life stages',hh.l,'l'],['Myths',hh.y,'y'],['Glossary',hh.g,'g']];let out='';
+ G.forEach(gr=>{const[t,arr,kind]=gr;if(!arr.length)return;out+=`<div class="rh">${t}</div>`+arr.map(id=>{
+  const lbl={r:()=>R[id].n,f:()=>id,n:()=>id+' network',c:()=>COND[id].n,d:()=>SUB[id].n,k:()=>CASES[id].n,l:()=>LIFE[id].n,y:()=>MYTHS[id].n,g:()=>id}[kind]();
+  const dsc={r:()=>R[id].fn.slice(0,2).join(' \u00b7 '),f:()=>FN[id].length+' regions',n:()=>NET[id].length+' regions',c:()=>COND[id].grp,d:()=>SUB[id].cls,k:()=>CASES[id].era,l:()=>LIFE[id].era,y:()=>'Popular claim, checked',g:()=>GLOSS[id].slice(0,80)+'\u2026'}[kind]();
+  return `<button class="rrow" data-go="${kind}:${id}">${lbl}<span class="rd">${dsc}</span></button>`}).join('')});
+ return out}
+/* ---------- shareable links ---------- */
+function writeHash(){try{const p=new URLSearchParams();if(S.mode!=='region')p.set('m',S.mode);if(S.sel)p.set('s',S.sel);
+ if(S.mode==='conditions'&&S.cnd)p.set('c',S.cnd);if(S.mode==='substances'&&S.sub)p.set('d',S.sub);if(S.mode==='cases'&&S.caseI)p.set('k',S.caseI);if(S.mode==='life'&&S.life)p.set('l',S.life);if(S.mode==='myths'&&S.myth)p.set('y',S.myth);
+ if(S.mode==='function'&&S.fn)p.set('f',S.fn);if(S.mode==='network'&&S.net)p.set('n',S.net);const q=p.toString();history.replaceState(null,'',q?'#'+q:location.pathname+location.search)}catch(e){}}
+function parseHash(){try{const p=new URLSearchParams(location.hash.slice(1)),m=p.get('m');
+ if(m&&MODES.some(x=>x[0]===m))S.mode=m;
+ if(p.get('s')&&R[p.get('s')])S.sel=p.get('s');
+ if(p.get('c')&&COND[p.get('c')])S.cnd=p.get('c');
+ if(p.get('d')&&SUB[p.get('d')])S.sub=p.get('d');
+ if(p.get('k')&&CASES[p.get('k')])S.caseI=p.get('k');
+ if(p.get('l')&&LIFE[p.get('l')])S.life=p.get('l');
+ if(p.get('y')&&MYTHS[p.get('y')])S.myth=p.get('y');
+ if(p.get('f')&&FN[p.get('f')])S.fn=p.get('f');
+ if(p.get('n')&&NET[p.get('n')])S.net=p.get('n')}catch(e){}}
+/* ---------- print & copy summary ---------- */
+const escHtml=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function sheetHtml(){const d=new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
+ const tmp=document.createElement('div');tmp.innerHTML=$('info').innerHTML;
+ tmp.querySelectorAll('.noprint,[data-pth],[data-link],[data-print],[data-copy]').forEach(el=>el.remove());
+ tmp.querySelectorAll('h3').forEach(h=>{if(h.textContent.trim()==='Your notes'){let n=h;while(n){const nx=n.nextSibling;n.remove();n=nx}}});
+ tmp.querySelectorAll('textarea').forEach(t=>t.remove());
+ tmp.querySelectorAll('button').forEach(b=>b.replaceWith(document.createTextNode(' '+b.textContent.trim()+' ')));
+ const notes=S.sel&&R[S.sel]?(ls.g('bxn:'+S.sel)||''):'';
+ const bms=S.bm.filter(k=>R[k]);
+ return `<h1>Brain explorer \u2014 summary</h1><p class="psmeta">${d} \u00b7 Educational summary, not clinical advice. Shapes and boundaries are schematic; findings are group-level research associations.</p>`+tmp.innerHTML
+ +(notes?`<h3>Your notes</h3><p>${escHtml(notes)}</p>`:'')
+ +(bms.length?`<h3>Bookmarked structures</h3><p>${bms.map(k=>R[k].n).join(', ')}</p>`:'')}
+function sheetText(){const d=document.createElement('div');d.innerHTML=sheetHtml();
+ d.querySelectorAll('h1,h2,h3').forEach(h=>{h.textContent='\n\n'+h.textContent.trim()+'\n'});
+ d.querySelectorAll('p,li').forEach(el=>{el.textContent=(el.tagName==='LI'?'\n  \u2022 ':'\n')+el.textContent.trim()});
+ return d.textContent.replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim()}
+function doPrint(){try{$('printsheet').innerHTML=sheetHtml()}catch(e){}window.print()}
+function doCopy(){const t=sheetText();if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(()=>{},()=>prompt('Copy this summary:',t));else prompt('Copy this summary:',t)}
+window.addEventListener('beforeprint',()=>{try{$('printsheet').innerHTML=sheetHtml()}catch(e){}});
+/* ---------- 11. EVENTS ---------- */
+$('modes').innerHTML=MODES.map(a=>`<button data-m="${a[0]}">${a[1]}</button>`).join('')+'<button data-t="start">Guided tour</button>';
 $('chips').innerHTML=ids.map(k=>`<button data-r="${k}"></button>`).join('');
-$('vw').innerHTML=[['Left side','1.5708,1.5708'],['Medial','-1.5708,1.5708'],['Front','0,1.5708'],['Top','0,.05']].map(a=>`<button data-v="${a[1]}">${a[0]}</button>`).join('')+(rm?'':'<button data-a="1">Auto-rotate</button>');
-$('vw').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.a){au=!au;b.classList.toggle('on',au)}else{const v=b.dataset.v.split(',').map(Number);th=v[0];ph=v[1];dirty=true}};
+$('vw').innerHTML=[['Left side','1.5708,1.5708'],['Medial','-1.5708,1.5708'],['Front','0,1.5708'],['Top','0,.05']].map(a=>`<button data-v="${a[1]}">${a[0]}</button>`).join('')+'<button data-a="lab">Labels</button><button data-a="path">Pathways</button>'+(rm?'':'<button data-a="1">Auto-rotate</button>');
+$('gloss').innerHTML=Object.keys(GLOSS).sort().map(k=>`<div class="gentry" data-ge="${k}"><button class="gbtn gterm" data-g="${k}">${k}</button><p class="gdef">${GLOSS[k]}</p></div>`).join('');
+document.querySelectorAll('details.refs')[1].id='refsd';
+$('refs').innerHTML=Object.keys(REFS).sort((a,b)=>REFS[a].localeCompare(REFS[b])).map(k=>`<p data-refp="${k}">${REFS[k]}</p>`).join('');
+$('vw').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+ if(b.dataset.a==='1'){au=!au;b.classList.toggle('on',au)}
+ else if(b.dataset.a==='lab'){S.lab=!S.lab;dirty=true;view()}
+ else if(b.dataset.a==='path'){togglePaths()}
+ else{const v=b.dataset.v.split(',').map(Number);th=v[0];ph=v[1];dirty=true}};
+function togglePaths(){if(S.paths==='off'){S.paths='on';S.pathSolo=null;if(S.op===1){S.op=.3;$('op').value=30;$('int').classList.add('on')}}
+ else{S.paths='off';S.pathSolo=null}apply();view()}
 $('op').oninput=e=>{S.op=e.target.value/100;$('int').classList.toggle('on',S.op<1);apply()};$('ax').onchange=e=>{S.ax=e.target.value;apply()};$('cut').oninput=e=>{S.cut=e.target.value/100;apply()};$('both').onchange=e=>{S.both=e.target.checked;apply()};
 $('int').onclick=e=>{S.op=S.op<1?1:.15;$('op').value=S.op*100;e.currentTarget.classList.toggle('on',S.op<1);apply()};
 $('q').oninput=e=>{S.q=e.target.value;view()};
-document.addEventListener('click',e=>{const r=e.target.closest('#chips [data-r]'),m=e.target.closest('[data-m]'),b=e.target.closest('[data-bm]');
- if(r)choose(r.dataset.r);else if(m){S.mode=m.dataset.m;if(S.mode==='quiz')newQ();view()}
- else if(b){const k=b.dataset.bm;S.bm=S.bm.includes(k)?S.bm.filter(x=>x!==k):S.bm.concat(k);ls.s('bxb',JSON.stringify(S.bm));view()}
- else if(e.target.id==='nx'){newQ();view()}});
+document.addEventListener('click',e=>{const t=e.target;
+ const r=t.closest('#chips [data-r]'),cq=t.closest('[data-cq]'),sq=t.closest('[data-sq]'),en=t.closest('[data-e]'),m=t.closest('[data-m]'),
+ bm=t.closest('[data-bm]'),go=t.closest('[data-go]'),g=t.closest('[data-g]'),rf=t.closest('[data-ref]'),tt=t.closest('[data-t]'),
+ qa=t.closest('[data-qa]'),pth=t.closest('[data-pth]'),lk=t.closest('[data-link]'),sys=t.closest('[data-sys]'),qc=t.closest('[data-qc]');
+ if(r)choose(r.dataset.r);
+ else if(cq){S.cq=cq.dataset.cq;view()}
+ else if(sq){S.sq=sq.dataset.sq;view()}
+ else if(en){const[kind,id]=en.dataset.e.split(':');if(kind==='c')S.cnd=S.cnd===id?null:id;if(kind==='d')S.sub=S.sub===id?null:id;if(kind==='k')S.caseI=S.caseI===id?null:id;if(kind==='l')S.life=S.life===id?null:id;if(kind==='y')S.myth=S.myth===id?null:id;S.sel=null;view()}
+ else if(m){S.mode=m.dataset.m;if(S.mode==='quiz'){S.qzc=S.qzc||'struct';newQ(S.qzc)}view()}
+ else if(bm){const k=bm.dataset.bm;S.bm=S.bm.includes(k)?S.bm.filter(x=>x!==k):S.bm.concat(k);ls.s('bxb',JSON.stringify(S.bm));view()}
+ else if(go){const[kind,id]=go.dataset.go.split(':');S.q='';$('q').value='';
+  if(kind==='r'){S.mode='region';S.sel=id}if(kind==='c'){S.mode='conditions';S.cnd=id;S.sel=null}
+  if(kind==='d'){S.mode='substances';S.sub=id;S.sel=null}if(kind==='k'){S.mode='cases';S.caseI=id;S.sel=null}
+  if(kind==='n'){S.mode='network';S.net=id;S.sel=null}if(kind==='f'){S.mode='function';S.fn=id;S.sel=null}
+  if(kind==='l'){S.mode='life';S.life=id;S.sel=null}if(kind==='y'){S.mode='myths';S.myth=id;S.sel=null}view()}
+ else if(g){const k=g.dataset.g,d=$('glossd');d.open=true;const el=d.querySelector('.gentry[data-ge="'+k+'"]');if(el){el.classList.add('open');el.scrollIntoView({behavior:'smooth',block:'center'})}}
+ else if(rf){const k=rf.dataset.ref,d=$('refsd');d.open=true;const p=d.querySelector('[data-refp="'+k+'"]');if(p){p.scrollIntoView({behavior:'smooth',block:'center'})}}
+ else if(tt){const a=tt.dataset.t;if(a==='start'){S.tourOn=true;S.tourI=0;TOUR[0].go()}
+  if(a==='next'){if(S.tourI<TOUR.length-1){S.tourI++;TOUR[S.tourI].go()}else{S.tourOn=false;S.tourI=0;view()}}
+  if(a==='prev'){if(S.tourI>0){S.tourI--;TOUR[S.tourI].go()}}
+  if(a==='end'){S.tourOn=false;S.tourI=0;view()}}
+ else if(qa){const q=S.qz;if(q&&!q.done&&(q.cat==='sys'||q.cat==='myth')){q.done=1;q.pick=qa.dataset.qa;S.sc[1]++;if(qa.dataset.qa===q.a)S.sc[0]++;view()}}
+ else if(pth){togglePaths()}
+ else if(lk){const url=location.href,btn=lk;const ok=()=>{btn.textContent='Link copied';setTimeout(()=>btn.textContent='Copy link to this view',1600)};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url).then(ok,()=>prompt('Copy this link:',url));else prompt('Copy this link:',url)}
+ else if(sys){S.pathSolo=S.pathSolo===sys.dataset.sys?null:sys.dataset.sys;paint(lit(),sl2());view()}
+ else if(qc){S.qzc=qc.dataset.qc;S.sc=[0,0];newQ(S.qzc);view()}
+ else if(t.closest('[data-print]')){doPrint()}
+ else if(t.closest('[data-copy]')){doCopy()}
+ else if(t.id==='nx'){newQ(S.qzc);view()}});
+function sl2(){return k=>S.mode==='compare'?S.cmp.includes(k):k===S.sel}
 document.addEventListener('change',e=>{if(e.target.dataset.s){S[e.target.dataset.s]=e.target.value;view()}});
 matchMedia('(prefers-color-scheme:dark)').addEventListener('change',view);new MutationObserver(view).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
-rs();apply();view();
-
+window.addEventListener('hashchange',()=>{parseHash();view()});
+parseHash();rs();apply();view();
 </script>
 </body>
 </html>
